@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+wheels/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Ruff / linters
+.ruff_cache/
+
+# Type checkers
+.mypy_cache/
+.pyright/
+pyrightconfig.json
+
+# Distribution / PyPI
+MANIFEST
+*.tar.gz
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Project data — ignore generated project directories
+# (users will have their own project dirs with trained prompts)
+*.db
+*.sqlite
+*.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Secrets / env files
+.env
+.env.*
+!.env.example
+
+tmp/*
+
+!.gitkeep

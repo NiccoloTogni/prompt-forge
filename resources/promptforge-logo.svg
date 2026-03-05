@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Forge glow gradient -->
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#FF8C00" stop-opacity="0.6"/>
+      <stop offset="60%" stop-color="#FF5500" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#FF5500" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- Anvil body gradient -->
+    <linearGradient id="anvilBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4A4A5A"/>
+      <stop offset="50%" stop-color="#2D2D3A"/>
+      <stop offset="100%" stop-color="#1A1A24"/>
+    </linearGradient>
+    
+    <!-- Anvil top surface -->
+    <linearGradient id="anvilTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6B6B80"/>
+      <stop offset="100%" stop-color="#4A4A5A"/>
+    </linearGradient>
+    
+    <!-- Hot metal gradient for the prompt "sheet" -->
+    <linearGradient id="hotMetal" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF4E0"/>
+      <stop offset="30%" stop-color="#FFAA33"/>
+      <stop offset="70%" stop-color="#FF6B00"/>
+      <stop offset="100%" stop-color="#CC4400"/>
+    </linearGradient>
+    
+    <!-- Spark gradient -->
+    <radialGradient id="spark">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="40%" stop-color="#FFDD44"/>
+      <stop offset="100%" stop-color="#FF6600" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- Text gradient -->
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E8E8F0"/>
+      <stop offset="100%" stop-color="#B0B0C0"/>
+    </linearGradient>
+    
+    <!-- Hammer gradient -->
+    <linearGradient id="hammerHead" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7A7A90"/>
+      <stop offset="100%" stop-color="#3A3A4A"/>
+    </linearGradient>
+    
+    <linearGradient id="hammerHandle" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8B6914"/>
+      <stop offset="50%" stop-color="#C49A2A"/>
+      <stop offset="100%" stop-color="#8B6914"/>
+    </linearGradient>
+
+    <!-- Outer glow filter -->
+    <filter id="outerGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    
+    <filter id="sparkGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+    
+    <filter id="hotGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="240" r="210" fill="#13131A"/>
+  <circle cx="256" cy="240" r="210" fill="url(#glow)"/>
+
+  <!-- === ANVIL === -->
+  <!-- Anvil base -->
+  <path d="M160 340 L180 380 L332 380 L352 340 Z" fill="url(#anvilBody)" stroke="#1A1A24" stroke-width="1"/>
+  
+  <!-- Anvil body -->
+  <path d="M140 290 L130 340 L382 340 L372 290 Z" fill="url(#anvilBody)" stroke="#3A3A4A" stroke-width="0.5"/>
+  
+  <!-- Anvil top face (the working surface) -->
+  <path d="M110 270 L105 290 L407 290 L402 270 Z" fill="url(#anvilTop)" stroke="#5A5A6A" stroke-width="0.5"/>
+  
+  <!-- Anvil top surface highlight -->
+  <path d="M115 270 L400 270" stroke="#8888A0" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Anvil horn (left pointed end) -->
+  <path d="M110 270 L60 275 L58 282 L105 290 Z" fill="url(#anvilBody)"/>
+  <path d="M110 270 L60 275" stroke="#6B6B80" stroke-width="0.5"/>
+  
+  <!-- Anvil step (right end) -->
+  <path d="M402 270 L420 270 L425 290 L407 290 Z" fill="#3A3A4A"/>
+  <path d="M402 258 L440 258 L442 270 L402 270 Z" fill="url(#anvilTop)"/>
+  
+  <!-- Anvil hardy hole -->
+  <rect x="390" y="260" width="8" height="8" rx="1" fill="#0A0A10"/>
+
+  <!-- === GLOWING PROMPT DOCUMENT on the anvil === -->
+  <g filter="url(#hotGlow)">
+    <!-- Document shape — slightly curled like hot metal being worked -->
+    <path d="M190 230 L190 268 L330 268 L330 225 L310 225 Z" 
+          fill="url(#hotMetal)" opacity="0.95"/>
+    <!-- Folded corner -->
+    <path d="M310 225 L310 245 L330 225 Z" fill="#FFCC66" opacity="0.8"/>
+    
+    <!-- "Text lines" on the document — representing prompt content -->
+    <line x1="205" y1="240" x2="290" y2="240" stroke="#FFF8E8" stroke-width="2.5" opacity="0.9" stroke-linecap="round"/>
+    <line x1="205" y1="248" x2="310" y2="248" stroke="#FFF0D0" stroke-width="2.5" opacity="0.7" stroke-linecap="round"/>
+    <line x1="205" y1="256" x2="275" y2="256" stroke="#FFE8B8" stroke-width="2.5" opacity="0.6" stroke-linecap="round"/>
+    
+    <!-- Cursor/caret blinking on the document -->
+    <rect x="278" y="252" width="2" height="10" rx="1" fill="#FFFFFF" opacity="0.9"/>
+  </g>
+
+  <!-- === HAMMER (angled, mid-strike) === -->
+  <g transform="rotate(-35, 260, 180)">
+    <!-- Handle -->
+    <rect x="245" y="120" width="12" height="100" rx="3" fill="url(#hammerHandle)"/>
+    <!-- Handle highlight -->
+    <rect x="249" y="125" width="4" height="90" rx="2" fill="#D4AA34" opacity="0.4"/>
+    
+    <!-- Hammer head -->
+    <rect x="225" y="100" width="52" height="28" rx="4" fill="url(#hammerHead)" stroke="#2A2A3A" stroke-width="1"/>
+    <!-- Head highlight -->
+    <rect x="228" y="103" width="46" height="3" rx="1.5" fill="#9999AA" opacity="0.5"/>
+    <!-- Head flat face -->
+    <rect x="225" y="122" width="52" height="6" rx="2" fill="#2A2A3A"/>
+  </g>
+
+  <!-- === SPARKS === -->
+  <!-- Spark particles flying from the strike point -->
+  <g>
+    <circle cx="210" cy="222" r="3" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="195" cy="210" r="2.5" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="225" cy="208" r="2" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="180" cy="218" r="2" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="240" cy="215" r="1.8" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="200" cy="200" r="1.5" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="170" cy="225" r="1.5" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="215" cy="195" r="1.2" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    <circle cx="250" cy="205" r="1.2" fill="url(#spark)" filter="url(#sparkGlow)"/>
+    
+    <!-- Small spark trails -->
+    <line x1="210" y1="222" x2="200" y2="215" stroke="#FFDD44" stroke-width="1" opacity="0.6"/>
+    <line x1="195" y1="210" x2="185" y2="200" stroke="#FFDD44" stroke-width="0.8" opacity="0.5"/>
+    <line x1="225" y1="208" x2="232" y2="198" stroke="#FFDD44" stroke-width="0.8" opacity="0.5"/>
+    <line x1="240" y1="215" x2="250" y2="208" stroke="#FFDD44" stroke-width="0.6" opacity="0.4"/>
+  </g>
+
+  <!-- === ITERATION ARROWS (subtle, around the anvil) === -->
+  <!-- Representing the iterative refinement process -->
+  <g opacity="0.3" fill="none" stroke="#FF8C00" stroke-width="2">
+    <path d="M130 320 Q 100 350, 130 370" stroke-linecap="round"/>
+    <polygon points="128,368 130,375 136,368" fill="#FF8C00"/>
+    
+    <path d="M382 320 Q 412 350, 382 370" stroke-linecap="round"/>
+    <polygon points="376,368 382,375 384,368" fill="#FF8C00"/>
+  </g>
+
+  <!-- === TEXT === -->
+  <!-- "PromptForge" -->
+  <text x="256" y="430" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="48" font-weight="700" letter-spacing="2">
+    <tspan fill="url(#textGrad)">Prompt</tspan><tspan fill="#FF8C00">Forge</tspan>
+  </text>
+  
+  <!-- Subtle tagline -->
+  <text x="256" y="458" text-anchor="middle" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="14" fill="#6A6A7A" letter-spacing="4" font-weight="300">
+    AUTOMATIC PROMPT ENGINEERING
+  </text>
+</svg>
