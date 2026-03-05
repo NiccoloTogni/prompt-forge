@@ -1,40 +1,77 @@
-# APE — Automatic Prompt Engineering
+<p align="center">
+  <img src="resources/promptforge-logo.svg" width="200" alt="PromptForge logo"/>
+</p>
 
-A Python library for incrementally training system prompts from examples. Instead of updating model weights, APE updates prompts — producing human-readable, versionable, editable "learned knowledge".
+<h1 align="center">PromptForge</h1>
+<p align="center"><em>Iterative, example-based prompt optimization — no fine-tuning required.</em></p>
+
+<p align="center">
+  <a href="#installation">Installation</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#architecture">Architecture</a>
+</p>
+
+---
 
 ## The Idea
 
 Traditional approaches to making LLMs perform complex tasks:
-- **Fine-tuning**: expensive, requires infrastructure, black box
-- **RAG**: retrieves examples at runtime, doesn't generalize rules
-- **Manual prompting**: doesn't scale, hard to cover all edge cases
 
-**APE takes a different approach**: feed thousands of examples to a "Prompt Engineering Agent" that distills patterns, rules, and edge cases into a comprehensive system prompt. The prompt *is* the learned model — it's human-readable, editable, and version-controlled.
+| Approach | Problem |
+|---|---|
+| **Fine-tuning** | Expensive, requires GPU infra, opaque |
+| **RAG** | Retrieves examples at runtime, doesn't generalize rules |
+| **Manual prompting** | Doesn't scale, hard to cover all edge cases |
+
+**PromptForge takes a different approach**: feed labeled examples to a *Prompt Engineering Agent* that distills patterns, rules, and edge cases into a comprehensive system prompt. The prompt *is* the learned model — human-readable, editable, and version-controlled.
+
+```
+[Seed prompt] + [Examples batch] → Optimizer LLM → [Improved prompt v1]
+[Prompt v1]   + [Training log]   → Optimizer LLM → [Improved prompt v2]
+     ...                    continues until convergence
+```
+
+---
 
 ## Installation
 
 ```bash
-pip install ape-toolkit
+pip install prompt-forge
 
 # With file type support:
-pip install ape-toolkit[pdf]     # PDF loading (pdfplumber + OCR)
-pip install ape-toolkit[excel]   # Excel loading
-pip install ape-toolkit[all]     # Everything
+pip install prompt-forge[pdf]     # PDF loading (pdfplumber + OCR)
+pip install prompt-forge[excel]   # Excel loading
+pip install prompt-forge[docx]    # Word document loading
+pip install prompt-forge[all]     # Everything
 ```
+
+---
 
 ## Quick Start
 
-### 1. Set Up Your LLM Client
+### 1. Implement an LLM client
 
-APE is provider-agnostic. You supply a client that implements the `LLMClient` protocol:
+PromptForge is provider-agnostic. Wrap any LLM in the `LLMClient` protocol:
+
+```python
+from prompt_forge import LLMMessage, LLMResponse
+
+class MyLLM:
+    def complete(self, messages: list[LLMMessage], **kwargs) -> LLMResponse:
+        # call your provider here
+        ...
+        return LLMResponse(text=..., usage={"input_tokens": ..., "output_tokens": ...})
+```
+
+<details>
+<summary>Example: OpenAI / Azure OpenAI</summary>
 
 ```python
 from openai import AzureOpenAI
-from ape import LLMMessage, LLMResponse
+from prompt_forge import LLMMessage, LLMResponse
 
 class AzureClient:
-    """Example: Azure OpenAI wrapper."""
-
     def __init__(self, deployment: str, **kwargs):
         self.client = AzureOpenAI(**kwargs)
         self.deployment = deployment
@@ -51,7 +88,6 @@ class AzureClient:
                 "input_tokens": resp.usage.prompt_tokens,
                 "output_tokens": resp.usage.completion_tokens,
             },
-            raw=resp,
         )
 
 llm = AzureClient(
@@ -61,25 +97,28 @@ llm = AzureClient(
     api_key="your-key",
 )
 ```
+</details>
 
-### 2. Define a Project
+---
+
+### 2. Set up a project
 
 ```python
-from ape import Project
+from prompt_forge import Project
 
-project = Project("heat_exchanger_extraction", llm=llm)
+project = Project("invoice_extraction", llm=llm)
 
-# Define what an "example" looks like
+# Define what an "example" looks like (role → file extension)
 project.set_bundle_schema(
     input=".pdf",
     expected_output=".json",
 )
 
-# Provide domain context
+# Optional: domain context helps the optimizer understand the task
 project.set_context(
     "These are heat exchanger purchase orders from European manufacturers. "
     "Fields to extract: model, manufacturer, thermal capacity (kW), "
-    "pressure rating (bar), material, dimensions, price, delivery date. "
+    "pressure rating (bar), material, price, delivery date. "
     "Units are metric. Prices in EUR unless stated otherwise."
 )
 
@@ -90,15 +129,13 @@ project.set_seed_prompt(
 )
 ```
 
-### 3. Load Training Examples
-
-Organize examples in directories:
+### 3. Load training examples
 
 ```
 training_data/
     example_001/
-        input.pdf           # The purchase order PDF
-        expected_output.json # The correct extracted data
+        input.pdf
+        expected_output.json
     example_002/
         input.pdf
         expected_output.json
@@ -113,203 +150,279 @@ print(f"Loaded {project.num_examples} examples")
 ### 4. Train
 
 ```python
-results = project.train(
-    batch_size=5,          # Examples per iteration
-    max_iterations=20,     # Maximum iterations
-    eval_strategy="json_fields",  # Field-by-field JSON comparison
-    patience=3,            # Stop after 3 iterations without improvement
+report = project.train(
+    batch_size=5,                    # Examples per optimizer call
+    max_iterations=20,               # Hard stop
+    eval_strategy="json_fields",     # Field-by-field JSON comparison
+    patience=3,                      # Stop after 3 non-improving iterations
 )
 
-# Check results
-for r in results:
-    print(f"Iteration {r.iteration}: "
-          f"score {r.score_before:.2f} → {r.score_after:.2f} "
-          f"({'✓' if r.improved else '✗'})")
+for r in report:
+    status = "✓" if r.improved else "✗"
+    print(f"Iter {r.iteration}: {r.score_before:.2f} → {r.score_after:.2f} {status}")
+
+# Training signals whether human review is recommended
+if report.refinement_recommended:
+    print(f"Score {report.final_score:.2f} — consider running project.refine()")
 ```
 
-### 5. Use in Production
+### 5. Run inference
 
 ```python
 agent = project.get_inference_agent()
-result = agent.run(input_file="new_order.pdf")
-print(result)  # Extracted JSON
+result = agent.run(input_file="new_invoice.pdf")
+print(result)   # str, or dict if output_schema is set
 ```
 
-## How Training Works
+---
 
-```
-Iteration 1:
-  [Seed prompt] + [Batch of 5 examples] → Optimizer → [Improved prompt v1]
-  
-Iteration 2:  
-  [Prompt v1] + [Training log] + [Next 5 examples] → Optimizer → [Prompt v2]
-  
-Iteration 3:
-  [Prompt v2] + [Training log] + [Next 5 examples] → Optimizer → [Prompt v3]
-  
-  ...continues until convergence or max iterations
-```
+## Features
 
-The **training log** is key: it's a compact summary of what was learned in each
-iteration. This travels with the prompt so the optimizer doesn't forget previous
-learnings when seeing new examples.
+### Structured JSON output
 
-The **prompt itself is the compressed knowledge** from all examples seen so far.
-You can inspect it, edit it, and understand exactly what the system has learned.
-
-
-## Key Components
-
-### Bundle Schema
-
-Defines what training examples look like for your project:
+Declare that your task produces structured JSON and the optimizer will automatically generate prompts that enforce valid JSON output. At inference time, the agent parses and validates the response.
 
 ```python
-# Data extraction: PDF → JSON
-project.set_bundle_schema(input=".pdf", expected_output=".json")
+project.set_output_schema({
+    "invoice_number": "string",
+    "supplier":       "string",
+    "total_eur":      "number",
+    "line_items":     "array",
+    "delivery_date":  "string",
+})
 
-# Spec generation: CSV data + template → specification document
-project.set_bundle_schema(
-    input_data=".csv",
-    template=".docx",
-    expected_output=".docx",
+report = project.train(eval_strategy="json_fields")
+
+agent = project.get_inference_agent()
+result = agent.run(input_file="invoice.pdf")
+print(result["total_eur"])   # dict, not a string
+```
+
+If the schema is not set explicitly, the optimizer **auto-detects** structured output by inspecting expected-output files: if ≥50% parse as JSON objects, it infers the schema from the union of their top-level keys.
+
+You can also supply an exact JSON Schema object:
+
+```python
+project.set_output_schema({
+    "type": "object",
+    "properties": {
+        "invoice_number": {"type": "string"},
+        "total_eur":      {"type": "number"},
+    }
+})
+```
+
+---
+
+### Human interactive refinement
+
+After automated training converges, use `project.refine()` to start an interactive session where you give direct feedback on the prompt:
+
+```python
+report = project.train(...)
+
+if report.refinement_recommended:
+    result = project.refine()
+    print(f"Revised {result.num_revisions} times, saved versions: {result.saved_versions}")
+```
+
+**Session commands:**
+
+| Input | Effect |
+|---|---|
+| Any text | Revise the prompt based on that feedback |
+| `test` | Run on a random example and show the output |
+| `test <id>` | Run on a specific example |
+| `show` | Display the full current prompt |
+| `save` | Save the current prompt as a new version |
+| `done` / `quit` | End the session |
+
+For non-CLI environments (Jupyter, web apps), pass custom `input_fn` / `output_fn` callbacks:
+
+```python
+result = project.refine(
+    input_fn=my_widget.get_input,
+    output_fn=my_widget.display,
 )
-
-# Translation: source text → translated text
-project.set_bundle_schema(source=".txt", expected=".txt")
 ```
 
-### Evaluation Strategies
+Or use `InteractiveOptimizer` directly without a full project:
 
 ```python
+from prompt_forge import InteractiveOptimizer
+
+optimizer = InteractiveOptimizer(llm=my_llm, store=my_store, bundles=my_bundles)
+result = optimizer.run_session(prompt_text=my_prompt)
+```
+
+---
+
+### Context window management
+
+Prevent optimizer calls from exceeding your model's context window:
+
+```python
+report = project.train(
+    max_tokens=100_000,   # Hard limit for the optimizer call
+)
+```
+
+- If the **full batch** exceeds the budget, it is trimmed automatically and a `WARNING` is logged.
+- If a **single example** is too large to fit on its own, training fails immediately with a clear error message identifying the offending example.
+
+For precise token counting, provide a model-specific tokenizer:
+
+```python
+import tiktoken
+enc = tiktoken.encoding_for_model("gpt-4o")
+
+report = project.train(
+    max_tokens=128_000,
+    optimizer_kwargs={"token_estimator": lambda text: len(enc.encode(text))},
+)
+```
+
+The default estimator uses `len(text) // 4` (~4 chars/token).
+
+---
+
+### Evaluation strategies
+
+```python
+# Field-by-field JSON comparison — ideal for data extraction
+project.train(eval_strategy="json_fields")
+
+# Text similarity (difflib ratio)
+project.train(eval_strategy="similarity")
+
+# LLM-as-judge — most flexible
+project.train(eval_strategy="llm_judge")
+
 # Exact string match
 project.train(eval_strategy="exact_match")
 
-# Field-by-field JSON comparison (great for data extraction)
-project.train(eval_strategy="json_fields")
-
-# Text similarity (difflib)
-project.train(eval_strategy="similarity")
-
-# LLM-as-judge (most flexible, uses your LLM to score quality)
-project.train(eval_strategy="llm_judge")
-
-# No evaluation (always accept new prompt — faster, less controlled)
+# Skip evaluation — always accept new prompt (faster, less controlled)
 project.train(eval_strategy="none")
 
 # Custom evaluator
-from ape import Evaluator, EvalResult
+from prompt_forge import Evaluator, EvalResult
 
 class MyEvaluator(Evaluator):
     def evaluate(self, actual: str, expected: str, **kwargs) -> EvalResult:
-        # Your custom logic
         score = my_comparison(actual, expected)
         return EvalResult(score=score, passed=score > 0.8)
 
 project.train(eval_strategy=MyEvaluator())
 ```
 
-### Custom File Loaders
+---
+
+### Batch selection strategies
 
 ```python
-from ape import get_default_loader
+from prompt_forge import FailurePriorityBatchStrategy
 
-loader = get_default_loader()
-
-# Register a custom loader for Parquet files
-def load_parquet(path):
-    import pandas as pd
-    df = pd.read_parquet(path)
-    return df.to_string()
-
-loader.register(".parquet", load_parquet)
-
-project = Project("my_project", llm=llm, file_loader=loader)
+# Focus on examples the current prompt fails on
+project.train(batch_strategy=FailurePriorityBatchStrategy())
 ```
 
-### Storage Backends
+---
 
-```python
-from ape import Project, FileSystemStore, SQLiteStore
-
-# Filesystem (default) — simple JSON files
-project = Project("my_project", llm=llm)
-
-# SQLite — better for querying history
-store = SQLiteStore("./my_project/prompts.db")
-project = Project("my_project", llm=llm, store=store)
-```
-
-### Prompt Versioning
+### Prompt versioning
 
 ```python
 # List all versions
 for v in project.list_versions():
-    print(f"v{v.version}: score={v.eval_score}, created={v.created_at}")
-    print(f"  Learned: {v.training_log_entry[:100]}")
+    print(f"v{v.version}: score={v.eval_score:.2f}  {v.training_log_entry[:80]}")
 
 # Get a specific version
 v3 = project.get_prompt(version=3)
 print(v3.prompt_text)
+print(v3.output_schema)   # JSON schema if applicable
 
-# Use a specific version for inference
+# Deploy a specific version
 agent = project.get_inference_agent(version=3)
 ```
 
-### Inference with Few-Shot Examples
+---
+
+### Storage backends
 
 ```python
-agent = project.get_inference_agent(
-    few_shot_examples=[
-        {
-            "input": "<input>...sample order text...</input>",
-            "output": '{"model": "HX-500", "manufacturer": "Alfa Laval", ...}'
-        }
-    ]
-)
+from prompt_forge import FileSystemStore, SQLiteStore
+
+# Filesystem (default) — JSON files, human-readable, git-friendly
+project = Project("my_project", llm=llm)
+
+# SQLite — better for querying history and metrics
+store = SQLiteStore("./my_project/prompts.db")
+project = Project("my_project", llm=llm, store=store)
 ```
 
-### Custom Inference Function
+---
 
-If your task requires special processing beyond a simple LLM call:
+### Custom file loaders
 
 ```python
-def my_inference(prompt_text: str, bundle) -> str:
-    contents = bundle.load_contents()
-    # Custom preprocessing, multi-step pipeline, etc.
-    input_text = preprocess(contents["input"].text)
-    result = call_my_pipeline(prompt_text, input_text)
-    return postprocess(result)
+from prompt_forge import get_default_loader
 
-project.train(inference_fn=my_inference)
+loader = get_default_loader()
+
+def load_parquet(path) -> str:
+    import pandas as pd
+    return pd.read_parquet(path).to_string()
+
+loader.register(".parquet", load_parquet)
+project = Project("my_project", llm=llm, file_loader=loader)
 ```
 
-### Monitoring Training Progress
+Supported out of the box: `.txt`, `.md`, `.json`, `.csv`, `.pdf`, `.xlsx`, `.xls`, `.docx`.
+
+---
+
+### Training callbacks and multi-file examples
 
 ```python
 def on_iteration(result):
     print(f"[Iter {result.iteration}] "
-          f"Score: {result.score_before:.3f} → {result.score_after:.3f} "
+          f"{result.score_before:.3f} → {result.score_after:.3f} "
           f"{'✓ IMPROVED' if result.improved else '✗'}")
     print(f"  Learned: {result.learnings[:200]}")
 
-project.train(on_iteration=on_iteration)
+# Multi-file examples: CSV data + template → specification document
+project.set_bundle_schema(
+    input_data=".csv",
+    template=".docx",
+    expected_output=".docx",
+)
+
+# Custom inference function for complex pipelines
+def my_inference(prompt_text: str, bundle) -> str:
+    contents = bundle.load_contents()
+    input_text = preprocess(contents["input_data"].text)
+    return call_my_pipeline(prompt_text, input_text)
+
+project.train(
+    on_iteration=on_iteration,
+    inference_fn=my_inference,
+)
 ```
 
+---
 
 ## Architecture
 
 ```
-ape/
+prompt_forge/
 ├── __init__.py              # Public API
-├── project.py               # Project class — main entry point
+├── project.py               # Project — main entry point
 ├── bundle.py                # ExampleBundle, BundleSchema, BundleCollection
 ├── llm/
-│   └── protocol.py          # LLMClient protocol (provider-agnostic)
+│   └── client.py            # LLMClient protocol (provider-agnostic)
 ├── file_loaders/
 │   └── loader.py            # FileLoader with built-in + custom loaders
 ├── training/
-│   ├── pipeline.py          # TrainingPipeline — orchestrates the loop
+│   ├── pipeline.py          # TrainingPipeline + TrainingReport
 │   ├── optimizer.py         # PromptOptimizer — the PE agent
 │   ├── batch_strategy.py    # Batch selection strategies
 │   └── training_log.py      # Compact training history
@@ -317,9 +430,13 @@ ape/
 │   └── agent.py             # InferenceAgent — uses trained prompts
 ├── evaluation/
 │   └── evaluator.py         # Evaluation strategies
+├── interactive/
+│   └── optimizer.py         # InteractiveOptimizer — human refinement
 └── storage/
-    └── project_store.py     # FileSystem + SQLite backends
+    └── project_store.py     # FileSystemStore + SQLiteStore backends
 ```
+
+---
 
 ## License
 
