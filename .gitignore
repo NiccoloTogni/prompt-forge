@@ -63,9 +63,11 @@ MANIFEST
 !.env.example
 
 tmp/*
+notebooks/tests_/*
 
 # Debug sandbox
 debug.py
 debug_data/
+examples/
 
 !.gitkeep

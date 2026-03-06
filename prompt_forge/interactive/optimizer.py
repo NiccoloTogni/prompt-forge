@@ -213,7 +213,6 @@ class InteractiveOptimizer:
 
         if self.context:
             user_parts.append(f"<task_context>\n{self.context}\n</task_context>")
-
         user_parts.append(f"<current_prompt>\n{current_prompt}\n</current_prompt>")
         user_parts.append(f"<human_feedback>\n{feedback}\n</human_feedback>")
 

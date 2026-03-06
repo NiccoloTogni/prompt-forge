@@ -14,46 +14,13 @@ import json
 import logging
 from typing import Any, Callable
 
+from .prompt import DEFAULT_META_PROMPT
 from ..llm.client import LLMClient, LLMMessage
 from ..file_loaders import FileLoader, get_default_loader
 from ..bundle import ExampleBundle
 
+MAX_PROMPT_LENGTH = 5000  # rough token estimate to prevent OOM errors
 logger = logging.getLogger(__name__)
-
-
-DEFAULT_META_PROMPT = """\
-You are an expert Prompt Engineer. Your job is to analyze examples of a task
-and produce the best possible system prompt that will enable an AI agent to
-perform this task accurately and consistently.
-
-You will be given:
-1. The current version of the system prompt (which may be a basic starting point)
-2. A training history summarizing what has been learned in previous iterations
-3. A batch of examples showing input → expected output pairs
-4. Optionally, evaluation results showing where the current prompt fails
-
-Your job is to:
-1. Carefully analyze every example to understand the patterns, rules, and edge cases.
-2. Compare the examples against the current prompt to find gaps — things the
-   current prompt doesn't cover, gets wrong, or is ambiguous about.
-3. Produce an IMPROVED system prompt that is:
-   - Extremely detailed and specific
-   - Covers all patterns and rules discovered so far
-   - Addresses every failure case
-   - Well-structured with clear sections
-   - Unambiguous — another AI reading this prompt should produce correct output
-
-CRITICAL RULES:
-- NEVER remove rules or details from the current prompt unless they are wrong.
-  The current prompt contains learnings from all previous iterations — preserve them.
-- ADD new rules, patterns, and edge cases discovered from the new examples.
-- REFINE existing rules if the new examples reveal they need adjustment.
-- Be extremely specific. Prefer concrete rules over vague guidelines.
-  Bad: "Pay attention to the format"
-  Good: "The date field must be in DD/MM/YYYY format. If the source uses MM/DD/YYYY, convert it."
-
-Respond with ONLY the improved system prompt text, nothing else.
-Do not wrap it in markdown code fences or add any preamble."""
 
 
 class PromptOptimizer:
@@ -197,6 +164,7 @@ class PromptOptimizer:
 
         Returns:
             A (possibly shorter) list of examples that fits in the budget.
+            if trimmed, a warning is logged.
         """
         # Build the overhead portion of the user message (everything except examples body)
         overhead_parts = []
@@ -381,8 +349,8 @@ class PromptOptimizer:
             )),
             LLMMessage(role="user", content=(
                 f"The prompt was updated after analyzing {len(examples)} examples.\n\n"
-                f"<old_prompt>\n{old_prompt[:2000]}{'...' if len(old_prompt) > 2000 else ''}\n</old_prompt>\n\n"
-                f"<new_prompt>\n{new_prompt[:2000]}{'...' if len(new_prompt) > 2000 else ''}\n</new_prompt>\n\n"
+                f"<old_prompt>\n{old_prompt[:MAX_PROMPT_LENGTH]}{'...' if len(old_prompt) > MAX_PROMPT_LENGTH else ''}\n</old_prompt>\n\n"
+                f"<new_prompt>\n{new_prompt[:MAX_PROMPT_LENGTH]}{'...' if len(new_prompt) > MAX_PROMPT_LENGTH else ''}\n</new_prompt>\n\n"
                 "Summarize the key changes and new learnings in 2-5 bullet points. "
                 "Focus on WHAT was learned, not how the prompt changed syntactically."
             )),

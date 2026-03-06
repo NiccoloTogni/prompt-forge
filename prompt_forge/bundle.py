@@ -13,8 +13,11 @@ Example schemas:
 import dataclasses
 from pathlib import Path
 from typing import Any
+import logging
 
 from .file_loaders import FileLoader, FileContent, get_default_loader
+
+logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass
@@ -133,15 +136,14 @@ class BundleCollection:
 
     def add_from_directory(
         self,
-        directory: str | Path,
-        pattern: str | None = None,
+        directory: str | Path
     ) -> int:
         """
         Auto-discover bundles from a directory structure.
 
         Expects one of two layouts:
 
-        1. Subdirectory layout (one subdirectory per bundle):
+        1. (Default) Subdirectory layout (one subdirectory per bundle):
             directory/
                 example_001/
                     input.pdf
@@ -168,8 +170,10 @@ class BundleCollection:
         # Try subdirectory layout first
         subdirs = [d for d in sorted(directory.iterdir()) if d.is_dir()]
         if subdirs:
+            logging.info(f"Loading bundles from subdirectories in {directory}...")
             loaded = self._load_subdir_layout(subdirs)
         else:
+            logging.info(f"Loading bundles from flat layout in {directory}...")
             loaded = self._load_flat_layout(directory)
 
         return loaded

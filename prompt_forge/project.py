@@ -222,7 +222,7 @@ class Project:
         self,
         batch_size: int = 5,
         max_iterations: int = 20,
-        eval_strategy: str | Evaluator = "llm_judge",
+        eval_strategy: str | Evaluator | None = "llm_judge",
         batch_strategy: BatchStrategy | None = None,
         min_improvement: float = 0.01,
         patience: int = 3,
@@ -389,8 +389,10 @@ class Project:
 
     # ── Internal ──────────────────────────────────────────────────────
 
-    def _resolve_evaluator(self, strategy: str | Evaluator) -> Evaluator:
-        """Convert string shortcut to Evaluator instance."""
+    def _resolve_evaluator(self, strategy: str | Evaluator | None) -> Evaluator | None:
+        """Convert string shortcut to Evaluator instance. Returns None to disable evaluation."""
+        if strategy is None or strategy == "none":
+            return None
         if isinstance(strategy, Evaluator):
             return strategy
         mapping = {
@@ -398,13 +400,12 @@ class Project:
             "json_fields": JsonFieldEvaluator,
             "similarity": SimilarityEvaluator,
             "llm_judge": lambda: LLMJudgeEvaluator(llm=self.llm, task_description=self._context),
-            "none": lambda: _NoOpEvaluator(),
         }
         factory = mapping.get(strategy)
         if factory is None:
             raise ValueError(
                 f"Unknown eval strategy '{strategy}'. "
-                f"Options: {list(mapping.keys())} or pass an Evaluator instance."
+                f"Options: {list(mapping.keys()) + ['none']} or pass an Evaluator instance."
             )
         return factory() if callable(factory) else factory
 
@@ -448,9 +449,3 @@ class Project:
         )
 
 
-class _NoOpEvaluator(Evaluator):
-    """Evaluator that always passes — used when eval_strategy='none'."""
-
-    def evaluate(self, actual, expected, **kwargs):
-        from .evaluation.evaluator import EvalResult
-        return EvalResult(score=1.0, passed=True, feedback="No evaluation.")

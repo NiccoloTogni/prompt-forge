@@ -34,8 +34,8 @@ class TrainingConfig:
     """Configuration for a training run."""
     batch_size: int = 10
     max_iterations: int = 20
-    min_improvement: float = 0.01  # Minimum score improvement to accept new prompt
-    patience: int = 3  # Stop after N iterations without improvement
+    min_improvement: float = 0.00  # Minimum score improvement to accept new prompt
+    patience: int = 5  # Stop after N iterations without improvement
     eval_sample_size: int | None = None  # How many examples to evaluate on (None = all)
     auto_save: bool = True
     output_schema: dict | None = None  # JSON schema if task requires structured output
@@ -97,7 +97,7 @@ class TrainingPipeline:
         llm: LLMClient,
         store: ProjectStore,
         bundles: BundleCollection,
-        evaluator: Evaluator,
+        evaluator: Evaluator | None = None,
         optimizer: PromptOptimizer | None = None,
         batch_strategy: BatchStrategy | None = None,
         file_loader: FileLoader | None = None,
@@ -189,7 +189,7 @@ class TrainingPipeline:
             # 2. Evaluate current prompt (optional, for scoring)
             score_before = None
             eval_feedback = ""
-            if config.eval_sample_size != 0:
+            if self.evaluator is not None and config.eval_sample_size != 0:
                 eval_result = self._evaluate_prompt(current_prompt, config.eval_sample_size)
                 score_before = eval_result.mean_score
                 if eval_result.failed_examples:
@@ -223,7 +223,7 @@ class TrainingPipeline:
             score_after = None
             improved = False
             new_eval_result = None
-            if config.eval_sample_size != 0:
+            if self.evaluator is not None and config.eval_sample_size != 0:
                 new_eval_result = self._evaluate_prompt(opt_result.new_prompt, config.eval_sample_size)
                 score_after = new_eval_result.mean_score
                 improved = (
@@ -232,7 +232,7 @@ class TrainingPipeline:
                 )
                 logger.info(f"Score after: {score_after:.3f} ({'improved' if improved else 'not improved'})")
             else:
-                # No evaluation — always accept
+                # No evaluator — always accept and run all iterations
                 improved = True
 
             # 5. Accept or reject
@@ -301,8 +301,8 @@ class TrainingPipeline:
                 )
                 break
 
-            # Early stopping
-            if no_improvement_count >= config.patience:
+            # Early stopping (only when evaluator is active)
+            if self.evaluator is not None and no_improvement_count >= config.patience:
                 logger.info(f"Early stopping: no improvement for {config.patience} iterations.")
                 break
 

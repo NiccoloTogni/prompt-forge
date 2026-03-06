@@ -55,6 +55,7 @@ class RandomBatchStrategy(BatchStrategy):
         used_ids: set[str] | None = None,
         failed_ids: list[str] | None = None,
     ) -> list[ExampleBundle]:
+        _ = failed_ids  # Not used in this strategy
         used_ids = used_ids or set()
         batch_size = min(batch_size, len(bundles))
 
