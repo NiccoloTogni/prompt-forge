@@ -71,6 +71,6 @@ debug_data/
 examples/
 
 # streamlit artifacts
-.prompt_forge_app/
+.prompt_forge_ui.json
 
 !.gitkeep
