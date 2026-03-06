@@ -70,4 +70,7 @@ debug.py
 debug_data/
 examples/
 
+# streamlit artifacts
+.prompt_forge_app/
+
 !.gitkeep

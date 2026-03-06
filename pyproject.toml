@@ -23,7 +23,11 @@ all   = [
     "openpyxl>=3.1",
     "python-docx>=1.0",
 ]
+app = ["streamlit>=1.36", "openai>=1.0"]
 dev = ["pytest>=7.0", "pytest-cov", "ruff"]
+
+[project.scripts]
+prompt-forge-ui = "prompt_forge.app:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["prompt_forge"]
