@@ -46,6 +46,15 @@ pip install prompt-forge[docx]    # Word document loading
 pip install prompt-forge[all]     # Everything
 ```
 
+**Install directly from GitHub** (latest development version):
+
+```bash
+pip install git+https://github.com/NiccoloTogni/prompt-forge.git
+
+# With extras:
+pip install "prompt-forge[all] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+```
+
 ---
 
 ## Quick Start

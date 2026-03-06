@@ -64,4 +64,8 @@ MANIFEST
 
 tmp/*
 
+# Debug sandbox
+debug.py
+debug_data/
+
 !.gitkeep

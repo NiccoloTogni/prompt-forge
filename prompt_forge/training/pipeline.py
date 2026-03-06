@@ -41,6 +41,7 @@ class TrainingConfig:
     output_schema: dict | None = None  # JSON schema if task requires structured output
     refinement_threshold: float = 0.8  # Scores below this recommend human refinement
     max_tokens: int | None = None  # Context window limit for optimizer; None disables check
+    max_total_tokens: int | None = None  # Budget for the whole run; None = unlimited
 
 
 @dataclasses.dataclass
@@ -53,6 +54,7 @@ class IterationResult:
     improved: bool
     learnings: str
     batch_ids: list[str]
+    tokens_used: int | None = None  # Total tokens consumed in this iteration (optimizer + eval)
 
 
 @dataclasses.dataclass
@@ -67,6 +69,7 @@ class TrainingReport:
     final_version: int
     final_score: float | None
     refinement_recommended: bool  # True if score is below refinement_threshold or unknown
+    total_tokens_used: int = 0   # Cumulative input + output tokens across the entire run
 
     def __iter__(self):
         return iter(self.iterations)
@@ -133,6 +136,7 @@ class TrainingPipeline:
         )
         self.batch_strategy = batch_strategy or RandomBatchStrategy()
         self.training_log = TrainingLog()
+        self._total_tokens: int = 0  # Running token counter across the whole training run
 
         # Restore state if available
         self._restore_state()
@@ -201,6 +205,7 @@ class TrainingPipeline:
                 logger.info(f"Score before: {score_before:.3f}")
 
             # 3. Optimize
+            tokens_before_iteration = self._total_tokens
             opt_result = self.optimizer.optimize(
                 current_prompt=current_prompt,
                 examples=batch,
@@ -209,10 +214,15 @@ class TrainingPipeline:
                 output_schema=config.output_schema,
                 max_tokens=config.max_tokens,
             )
+            # Accumulate optimizer tokens (inference tokens are added inside _default_inference)
+            self._total_tokens += self._count_tokens(opt_result.usage)
+            logger.info(f"Optimizer tokens this call: {self._count_tokens(opt_result.usage):,} "
+                        f"(running total: {self._total_tokens:,})")
 
             # 4. Evaluate new prompt
             score_after = None
             improved = False
+            new_eval_result = None
             if config.eval_sample_size != 0:
                 new_eval_result = self._evaluate_prompt(opt_result.new_prompt, config.eval_sample_size)
                 score_after = new_eval_result.mean_score
@@ -239,7 +249,7 @@ class TrainingPipeline:
                     parent_version=current_version - 1,
                     training_log_entry=opt_result.learnings,
                     eval_score=score_after,
-                    eval_details=new_eval_result.to_dict() if score_after is not None else None,
+                    eval_details=new_eval_result.to_dict() if new_eval_result is not None else None,
                     output_schema=opt_result.output_schema,
                     metadata={"batch_ids": batch_ids, "iteration": iteration},
                 )
@@ -267,6 +277,7 @@ class TrainingPipeline:
                 self._save_state(iteration)
 
             # Build iteration result
+            iteration_tokens = self._total_tokens - tokens_before_iteration
             iter_result = IterationResult(
                 iteration=iteration,
                 prompt_version=current_version,
@@ -275,11 +286,20 @@ class TrainingPipeline:
                 improved=improved,
                 learnings=opt_result.learnings,
                 batch_ids=batch_ids,
+                tokens_used=iteration_tokens,
             )
             results.append(iter_result)
 
             if self.on_iteration:
                 self.on_iteration(iter_result)
+
+            # Token budget check
+            if config.max_total_tokens is not None and self._total_tokens >= config.max_total_tokens:
+                logger.warning(
+                    f"Total token budget reached: {self._total_tokens:,} tokens used "
+                    f"(max_total_tokens={config.max_total_tokens:,}). Stopping training early."
+                )
+                break
 
             # Early stopping
             if no_improvement_count >= config.patience:
@@ -295,6 +315,7 @@ class TrainingPipeline:
             refinement_recommended=(
                 final_score is None or final_score < config.refinement_threshold
             ),
+            total_tokens_used=self._total_tokens,
         )
 
     def _evaluate_prompt(
@@ -344,13 +365,26 @@ class TrainingPipeline:
         ]
 
         response = self.llm.complete(messages, temperature=0.0)
+        if response.usage:
+            self._total_tokens += (
+                response.usage.get("input_tokens", 0)
+                + response.usage.get("output_tokens", 0)
+            )
         return response.text
+
+    @staticmethod
+    def _count_tokens(usage: dict[str, int] | None) -> int:
+        """Sum input and output tokens from a usage dict."""
+        if usage is None:
+            return 0
+        return usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
 
     def _save_state(self, iteration: int) -> None:
         """Save training state for resumption."""
         state = {
             "last_iteration": iteration,
             "training_log": self.training_log.to_dict(),
+            "total_tokens_used": self._total_tokens,
         }
         self.store.save_training_state(state)
 
@@ -359,6 +393,8 @@ class TrainingPipeline:
         state = self.store.load_training_state()
         if state and "training_log" in state:
             self.training_log = TrainingLog.from_dict(state["training_log"])
+            self._total_tokens = state.get("total_tokens_used", 0)
             logger.info(
-                f"Restored training state: {len(self.training_log.entries)} previous iterations"
+                f"Restored training state: {len(self.training_log.entries)} previous iterations, "
+                f"{self._total_tokens} tokens used so far"
             )

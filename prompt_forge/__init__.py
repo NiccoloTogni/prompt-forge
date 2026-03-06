@@ -23,7 +23,7 @@ __version__ = "0.1.0"
 from .project import Project
 from .inference.agent import InferenceAgent
 from .bundle import BundleSchema, BundleCollection, ExampleBundle
-from .llm.protocol import LLMClient, LLMResponse, LLMMessage
+from .llm.client import LLMClient, LLMResponse, LLMMessage
 from .file_loaders import FileLoader, FileContent, get_default_loader
 from .storage.project_store import (
     FileSystemStore,

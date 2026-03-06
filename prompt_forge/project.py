@@ -1,19 +1,26 @@
 """
-Project — the main entry point for the APE library.
+Project — the main entry point for the PromptForge library.
 
 A Project ties together all components: storage, bundles, training, inference.
 It provides a high-level API for the full workflow.
+
+    Usage:
+        project = Project("my_project", llm=my_llm_client)
+        project.set_bundle_schema(input=".pdf", expected_output=".json")
+        project.add_examples_from_directory("./training_data/")
+        project.set_seed_prompt("Extract all fields from the document...")
+        project.train(batch_size=5, max_iterations=20)
+
+        agent = project.get_inference_agent()
+        result = agent.run(input_file="new_file.pdf")
 """
 
-from __future__ import annotations
-
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
-from .llm.protocol import LLMClient
+from .llm.client import LLMClient
 from .file_loaders import FileLoader, get_default_loader
 from .bundle import BundleSchema, BundleCollection, ExampleBundle
 from .storage.project_store import FileSystemStore, ProjectStore, PromptVersion
@@ -34,23 +41,6 @@ logger = logging.getLogger(__name__)
 
 
 class Project:
-    """
-    Main entry point for the APE library.
-
-    A Project encapsulates an entire prompt engineering workflow:
-    defining training data, running the training loop, and using
-    the resulting prompts for inference.
-
-    Usage:
-        project = Project("my_project", llm=my_llm_client)
-        project.set_bundle_schema(input=".pdf", expected_output=".json")
-        project.add_examples_from_directory("./training_data/")
-        project.set_seed_prompt("Extract all fields from the document...")
-        project.train(batch_size=5, max_iterations=20)
-
-        agent = project.get_inference_agent()
-        result = agent.run(input_file="new_file.pdf")
-    """
 
     def __init__(
         self,
@@ -241,6 +231,7 @@ class Project:
         on_iteration: Callable | None = None,
         optimizer_kwargs: dict | None = None,
         max_tokens: int | None = None,
+        max_total_tokens: int | None = None,
     ) -> TrainingReport:
         """
         Run the incremental training loop.
@@ -257,9 +248,11 @@ class Project:
             inference_fn: Custom inference function (prompt, bundle) -> str.
             on_iteration: Callback after each iteration.
             optimizer_kwargs: Extra kwargs for the PromptOptimizer (e.g. token_estimator).
-            max_tokens: Context window token limit for the optimizer. When set,
+            max_tokens: Context window token limit per optimizer call. When set,
                         the batch is trimmed to fit (warning logged). If a single
                         example exceeds the budget alone, training fails with an error.
+            max_total_tokens: Total token budget for the entire training run. Training
+                              stops early with a warning when this limit is reached.
 
         Returns:
             TrainingReport with per-iteration results and refinement signal.
@@ -287,6 +280,7 @@ class Project:
             eval_sample_size=eval_sample_size,
             output_schema=self._output_schema,
             max_tokens=max_tokens,
+            max_total_tokens=max_total_tokens,
         )
 
         pipeline = TrainingPipeline(

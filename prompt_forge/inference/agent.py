@@ -229,5 +229,9 @@ class InferenceAgent:
         """Human-readable summary of the loaded prompt."""
         lines = len(self.prompt_text.splitlines())
         chars = len(self.prompt_text)
-        schema_info = f", output_schema={list(self.output_schema.get('properties', self.output_schema).keys())}" if self.output_schema else ""
+        if self.output_schema:
+            keys = list(self.output_schema.get("properties", self.output_schema).keys())
+            schema_info = f", output_schema={keys}"
+        else:
+            schema_info = ""
         return f"Prompt: {lines} lines, {chars} chars{schema_info}"

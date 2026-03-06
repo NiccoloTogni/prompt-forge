@@ -148,14 +148,17 @@ class PromptOptimizer:
         response = self.llm.complete(messages, **self.llm_kwargs)
         new_prompt = response.text.strip()
 
-        # Now ask the optimizer to summarize what it learned
-        learnings = self._extract_learnings(current_prompt, new_prompt, examples)
+        # Summarize what was learned (second LLM call)
+        learnings, learnings_usage = self._extract_learnings(current_prompt, new_prompt, examples)
+
+        # Combine token usage from both calls
+        combined_usage = self._sum_usage(response.usage, learnings_usage)
 
         return OptimizerResult(
             new_prompt=new_prompt,
             learnings=learnings,
             output_schema=resolved_schema,
-            usage=response.usage,
+            usage=combined_usage,
         )
 
     def _estimate_tokens(self, text: str) -> int:
@@ -365,8 +368,12 @@ class PromptOptimizer:
         old_prompt: str,
         new_prompt: str,
         examples: list[ExampleBundle],
-    ) -> str:
-        """Ask the LLM to summarize what was learned in this iteration."""
+    ) -> tuple[str, dict[str, int] | None]:
+        """Ask the LLM to summarize what was learned in this iteration.
+
+        Returns:
+            (learnings_text, usage_dict)
+        """
         messages = [
             LLMMessage(role="system", content=(
                 "You are summarizing what was learned from a prompt optimization iteration. "
@@ -382,7 +389,20 @@ class PromptOptimizer:
         ]
 
         response = self.llm.complete(messages, temperature=0.0)
-        return response.text.strip()
+        return response.text.strip(), response.usage
+
+    @staticmethod
+    def _sum_usage(
+        a: dict[str, int] | None,
+        b: dict[str, int] | None,
+    ) -> dict[str, int] | None:
+        """Sum two usage dicts, returning None only if both are None."""
+        if a is None and b is None:
+            return None
+        result: dict[str, int] = {}
+        for key in ("input_tokens", "output_tokens"):
+            result[key] = (a or {}).get(key, 0) + (b or {}).get(key, 0)
+        return result
 
 
 class OptimizerResult:
