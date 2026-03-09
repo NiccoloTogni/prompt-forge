@@ -55,7 +55,6 @@ MANIFEST
 
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb
 
 # Secrets / env files
 .env
@@ -63,12 +62,12 @@ MANIFEST
 !.env.example
 
 tmp/*
-notebooks/tests_/*
 
 # Debug sandbox
 debug.py
 debug_data/
 examples/local_
+notebooks/tests_/*
 
 # streamlit artifacts
 .prompt_forge_ui.json

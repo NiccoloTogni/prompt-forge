@@ -1,0 +1,42 @@
+{
+  "product_name": "WeldMaster WM-R400",
+  "manufacturer": "ArcFusion Welding Systems",
+  "part_number": "AFS-WMR400-MIG",
+  "year_of_manufacture": 2024,
+  "machine_type": "Robotic Welding Cell",
+  "application_sector": "Construction and heavy equipment",
+  "power_supply": {
+    "voltage_v": 480,
+    "phases": 3,
+    "frequency_hz": 60,
+    "power_rating_kw": 85
+  },
+  "dimensions": {
+    "length_mm": 4500,
+    "width_mm": 3200,
+    "height_mm": 2800
+  },
+  "weight_kg": 5500,
+  "operating_conditions": {
+    "temperature_min_c": 0,
+    "temperature_max_c": 40,
+    "humidity_max_pct": 90
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "18 assemblies/shift",
+    "accuracy_mm": 0.3,
+    "noise_level_db": 80
+  },
+  "safety_certifications": [
+    "CE",
+    "ISO 10218-2",
+    "EN ISO 11611"
+  ],
+  "communication_interfaces": [
+    "EtherNet/IP",
+    "PROFINET"
+  ],
+  "maintenance_interval_hours": 1000,
+  "warranty_years": 2
+}

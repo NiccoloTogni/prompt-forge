@@ -1,0 +1,33 @@
+GrindPro GP-4080 Precision Surface Grinder
+-------------------------------------------
+Builder: HardEdge Machine Tools Co.
+Model Code: HEM-GP4080-V2
+Year: 2023
+
+The GP-4080 is a precision surface grinder with electromagnetic chuck, used in tool & die making. It features automatic crossfeed and downfeed with programmable spark-out cycles.
+
+Power Supply
+Input: 220V single-phase, 60 Hz
+Motor power: 5.5 kW (7.5 HP)
+
+Machine Size
+Table travel (L): 80 inches
+Crossfeed (W): 40 inches
+Column height: 65 inches
+Weight: 8,150 lbs
+
+Environment
+The grinder is rated for shop floor use in temperatures of 15°C to 35°C with relative humidity not exceeding 65%.
+
+Performance Specs
+Wheel spindle speed: 1,450 RPM
+Surface finish achievable: Ra 0.2 µm
+Grinding accuracy: 0.005 mm (table flatness)
+Noise emission: 70 dB(A)
+
+Conformity: CE, ISO 16089 (safety of grinding machines)
+
+Data interfaces: RS-232 serial
+
+Scheduled maintenance: 1,500 hours
+Warranty: 2 years

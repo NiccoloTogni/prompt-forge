@@ -1,0 +1,19 @@
+Technical Description: PlasmaCut PC-3060 CNC Plasma Cutting Table
+
+The PC-3060 is manufactured by CutRight Industrial Technologies and carries the part reference CRT-PC3060-HD. It was produced in 2024.
+
+This machine is a heavy-duty gantry-type CNC plasma cutting system designed for steel service centers, specifically for cutting structural plate up to 50 mm thick. The working area covers 3,000 mm × 6,000 mm.
+
+Regarding electrical supply, the system requires 400 volts on a three-phase, 50 Hz connection. The plasma source and drives together consume approximately 62 kW at full power.
+
+The overall dimensions of the table are roughly 8.2 meters in length, 4.1 meters in width, and 2.3 meters in height. It weighs around 7,800 kilograms without material loaded on the bed.
+
+For environmental requirements, the system should operate in ambient temperatures between 5 °C and 40 °C, with maximum humidity of 80 percent.
+
+In terms of performance, the gantry can traverse at up to 35 meters per minute. Typical throughput on 10mm plate is 25 parts per hour. The cutting tolerance is within ±0.5 mm, and the machine produces about 84 decibels during cutting operations.
+
+The machine complies with CE requirements, EN ISO 11553-1 for safety of thermal cutting equipment, and EN 12584 for imperfections in thermal cutting.
+
+The CNC controller communicates via EtherCAT for real-time axis control, and provides a standard Ethernet port for file transfer and remote diagnostics.
+
+Preventive maintenance should be performed every 2,000 operating hours. The standard warranty is 2 years.

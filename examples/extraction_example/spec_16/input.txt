@@ -1,0 +1,26 @@
+SparkLine SL-320 Wire EDM Machine
+
+Produced by ElectroCut Precision Technologies
+(Ordering reference: EPT-SL320-CNC, manufactured 2024)
+
+Purpose: Precision wire electrical discharge machining for mold & die and medical device component manufacturing. Capable of cutting hardened tool steels, tungsten carbide, and titanium alloys.
+
+The SL-320 requires a 3-phase electrical supply at 400 V / 50 Hz with a power demand of approximately 15 kW.
+
+Physical details: The machine footprint is 2,100 × 1,800 mm with a height of 2,200 mm. The net weight is listed at 3,200 kg.
+
+Environmental constraints — ambient temperature 15–35°C, humidity ≤60% to prevent condensation on guide elements.
+
+Performance:
+  Wire feed rate: adjustable up to 15 m/min
+  Surface roughness: Ra 0.15 µm achievable
+  Cutting accuracy: ±0.002 mm
+  Max workpiece height: 420 mm
+  Sound level: 62 dB(A)
+
+Conformity marks: CE, EN 12957 (EDM safety)
+
+The controller offers PROFINET and USB connectivity for program transfer.
+
+Scheduled maintenance interval: 2,000 running hours.
+Warranty terms: 2 years from installation.

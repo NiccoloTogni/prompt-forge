@@ -1,0 +1,32 @@
+DATASHEET — TITAN HP-3000 HYDRAULIC PRESS
+
+Manufacturer: ForgeLine Heavy Industries
+Part No.: FLH-HP3000-A2
+Year: 2023
+
+The TITAN HP-3000 is a 4-column hydraulic press intended for deep drawing and metal forming operations in the automotive stamping sector. The press delivers up to 3000 kN of clamping force through a servo-hydraulic drive system.
+
+ELECTRICAL SUPPLY
+- Supply Voltage: 400V AC, 3-phase, 50 Hz
+- Installed Power: 55 kW
+
+PHYSICAL DATA
+- Overall Dimensions (L × W × H): 3200 mm × 2100 mm × 4500 mm
+- Net Weight: 18,500 kg
+
+WORKING ENVIRONMENT
+- Ambient Temperature: +5 °C to +45 °C
+- Maximum Relative Humidity: 80%
+
+PERFORMANCE
+- Ram Speed (max): 250 mm/s
+- Throughput: 12 cycles/min
+- Positioning Accuracy: ±0.05 mm
+- Sound Pressure Level: 78 dB(A) at 1m
+
+CERTIFICATIONS: CE, ISO 13849-1 PLd, EN 693
+
+CONNECTIVITY: PROFINET, EtherCAT, OPC UA
+
+MAINTENANCE: Recommended service interval every 4,000 operating hours.
+WARRANTY: 2 years standard.

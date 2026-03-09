@@ -1,0 +1,33 @@
+SPECIFICATION SUMMARY
+
+Equipment: OverHead OHC-50 Double Girder Bridge Crane
+Produced by: LiftCore Crane Systems Ltd.
+Item code: LCS-OHC50-DG
+Date of manufacture: 2022
+
+The OHC-50 is a 50-tonne overhead bridge crane for heavy steel fabrication workshops. It has a span of 22 m with a lift height of 12 m.
+
+Electrical Info
+Supply: 400 V / three-phase / 50 Hz
+Motor power (total): 45 kW (hoist 30 kW + travel 15 kW)
+
+Dimensions
+Bridge span: 22,000 mm
+Overall width (including end carriages): 3,500 mm
+Height above rail: 2,200 mm
+Crane dead weight: 32 tonnes
+
+Operating environment
+Temperature: -10°C — +50°C
+
+Performance
+Hoist speed: 8 m/min
+Travel speed: 40 m/min
+Noise during operation: 74 dB(A)
+
+Safety
+CE marked per Machinery Directive
+EN 15011 (cranes — bridge and gantry cranes)
+EN 13135 (cranes — safety — design)
+
+Service every 2,500 hours. Warranty 2 years on structural, 1 year on electrical.

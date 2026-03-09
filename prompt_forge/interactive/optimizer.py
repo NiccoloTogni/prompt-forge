@@ -291,7 +291,7 @@ class InteractiveOptimizer:
             LLMMessage(role="system", content=prompt_text),
             LLMMessage(role="user", content="\n\n".join(input_parts)),
         ]
-        response = self.llm.complete(messages, temperature=0.0)
+        response = self.llm.complete(messages)
         return response.text
 
     def _resolve_bundle(self, bundle_id: str | None) -> ExampleBundle | None:

@@ -1,0 +1,34 @@
+TECHNICAL DATA — CONVEYPRO CP-1800 BELT CONVEYOR SYSTEM
+
+Supplier: TransLine Material Handling
+Ref: TLM-CP1800-HD
+Manufactured: 2023
+
+APPLICATION
+The CP-1800 is a heavy-duty belt conveyor designed for aggregate and bulk material transport in the mining and quarry sector. Belt width is 1800 mm with a design capacity of 2,500 t/h.
+
+POWER
+Voltage: 690 V AC
+3-phase / 50 Hz
+Drive motor rating: 250 kW (2× 125 kW geared motors)
+
+DIMENSIONS
+The conveyor frame is 24 m long, 2.4 m wide, and 1.6 m high (at discharge end).
+Total installed weight: approximately 14,200 kg.
+
+ENVIRONMENT
+Rated for outdoor use in temperatures from –20 °C to +50 °C.
+
+OPERATIONAL PARAMETERS
+Belt speed (max): 3.5 m/s
+Throughput: 2,500 tonnes per hour
+Noise: 82 dB(A) measured at 2 meters from drive station
+
+STANDARDS
+CE marking, EN 620 (continuous handling equipment), ISO 5048
+
+INTERFACES
+Hardwired I/O + Modbus RTU for PLC integration
+
+MAINTENANCE
+Lubrication and inspection recommended every 2,000 operating hours.

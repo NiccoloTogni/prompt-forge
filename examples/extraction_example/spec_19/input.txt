@@ -1,0 +1,33 @@
+SPECIFICATION — LOGIMOVE LM-1500 AUTOMATED GUIDED VEHICLE
+
+Manufacturer: SmartTrans Logistics Automation
+Order number: SLA-LM1500-NAV
+Production year: 2024
+
+Overview
+The LM-1500 is a laser-guided AGV (Automated Guided Vehicle) with a 1,500 kg payload for pallet transport in the warehouse and intralogistics sector. It uses natural feature navigation (SLAM) with safety-rated laser scanners.
+
+Electrical
+Battery: 48V / 200Ah LFP (charges from 400V 3-phase 50Hz mains via onboard charger)
+Drive power: 4.8 kW (2× 2.4 kW wheel motors)
+
+Physical
+Length: 1,600 mm
+Width: 900 mm
+Height: 450 mm (lowered, 600 mm lifted)
+Vehicle weight: 680 kg (empty)
+
+Operating conditions
+Temperature: 2°C to 40°C
+
+Performance
+Max travel speed: 1.8 m/s
+Throughput: 40 pallet moves/hour
+Navigation accuracy: ±10 mm
+
+Safety: CE, EN ISO 3691-4 (driverless industrial trucks), ISO 13849-1 PLd
+
+Communication: Wi-Fi 5 (802.11ac), PROFINET (for fleet manager), REST API
+
+Maintenance: Annual inspection plus 5,000-hour drive unit service
+Warranty: 3 years

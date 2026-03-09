@@ -1,0 +1,32 @@
+SPEC SHEET: WrapLine WL-500 Horizontal Flow Wrapper
+
+Built by PackFlow Automation GmbH
+Reference: PFA-WL500-MK3
+Year of build: 2023
+
+Intended use: The WL-500 is a HFFS (Horizontal Form Fill Seal) machine for primary packaging of baked goods, confectionery, and snack foods in the food processing industry. It handles products up to 500 mm in length.
+
+Electrical specifications
+  Supply voltage: 400 V, 3 phases, 50 Hz
+  Power: 12 kW
+
+Machine dimensions
+  2,800 mm long × 1,100 mm wide × 1,700 mm tall
+
+Operating environment
+  Temperature: 10 °C min, 38 °C max
+  Humidity: max 80%, non-condensing
+
+Performance characteristics
+  Film feed speed: up to 60 m/min
+  Pack rate: 250 packs per minute
+  Accuracy (seal jaw position): ±0.5 mm
+  Noise level: 73 dB(A)
+
+Certifications
+  CE, EN 415-1 (packaging machine safety), EHEDG certified (hygienic design)
+
+Communications
+  EtherCAT, PROFINET, OPC UA
+
+Warranty: 1 year standard

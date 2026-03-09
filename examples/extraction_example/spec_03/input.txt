@@ -1,0 +1,28 @@
+FlexArm RA-220 — Industrial Articulated Robot
+
+Manufactured by RoboMotion AG
+Order code RM-RA220-6AX | Year of production: 2024
+
+Designed for pick-and-place and palletizing tasks in the food & beverage packaging industry, the RA-220 is a 6-axis articulated robot arm with 220 kg payload capacity.
+
+Power requirements: The unit operates on 480 V, 3-phase, 60 Hz supply. Maximum power draw is 8.5 kW.
+
+Physical specifications:
+  Base footprint: 800 × 800 mm
+  Overall height (parked position): 2,350 mm
+  Robot weight: 1,150 kg
+
+The robot may be used in environments ranging from 0°C to 45°C with humidity up to 85% RH.
+
+Performance data:
+  Maximum joint speed: 180°/s (equivalent to approx. 30 RPM at J1)
+  Cycle rate: 1,200 picks/hour
+  Repeatability: ±0.06 mm
+  Noise output: 65 dB(A)
+
+Compliant with: CE Machinery Directive 2006/42/EC, ISO 10218-1, EN ISO 13849-1 PLd.
+
+Communication: EtherNet/IP, PROFINET, DeviceNet
+
+Maintenance schedule: every 5,000 hours or 12 months (whichever comes first).
+Warranty period: 3 years.

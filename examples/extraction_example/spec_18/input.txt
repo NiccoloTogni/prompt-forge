@@ -1,0 +1,34 @@
+BendForce BF-320 CNC Press Brake
+Technical Specification Document
+
+Manufacturer: MetalForm Machinery NV
+Code: MFM-BF320-CNC6
+Year: 2024
+
+Description:
+The BF-320 is a 320-tonne CNC hydraulic press brake with 6-axis backgauge for precision sheet metal bending. It serves the general sheet metal fabrication industry.
+
+Bending length: 4,100 mm
+Bending force: 3,200 kN
+
+Electrical:
+  - Mains: 400V, 3-ph, 50 Hz
+  - Total power: 30 kW
+
+Machine envelope:
+  4.6 m long × 1.8 m wide × 2.9 m tall
+  Mass: 14,800 kg
+
+Working conditions:
+  Ambient temperature from 5 to 45°C. Max humidity 80%.
+
+Bending performance:
+  Ram speed: Approach 200 mm/s, bending 10 mm/s, return 180 mm/s
+  Throughput: varies by part complexity
+  Backgauge accuracy: ±0.02 mm
+  Noise during bending: 76 dB(A)
+
+Compliance: CE, EN 12622 (press brake safety), ISO 13849-1 PLd
+Interfaces: PROFINET, USB, Ethernet (for remote support)
+Service: 3,000 hours between scheduled services
+Warranty: 2 years

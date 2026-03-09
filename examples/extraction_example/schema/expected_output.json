@@ -1,0 +1,40 @@
+{
+  "$schema_description": "Unified extraction schema for industrial machinery specifications",
+  "product_name": "string",
+  "manufacturer": "string",
+  "part_number": "string",
+  "year_of_manufacture": "integer | null",
+  "machine_type": "string",
+  "application_sector": "string",
+  "power_supply": {
+    "voltage_v": "float | null",
+    "phases": "integer | null",
+    "frequency_hz": "float | null",
+    "power_rating_kw": "float | null"
+  },
+  "dimensions": {
+    "length_mm": "float | null",
+    "width_mm": "float | null",
+    "height_mm": "float | null"
+  },
+  "weight_kg": "float | null",
+  "operating_conditions": {
+    "temperature_min_c": "float | null",
+    "temperature_max_c": "float | null",
+    "humidity_max_pct": "float | null"
+  },
+  "performance": {
+    "max_speed_rpm": "float | null",
+    "throughput": "string | null",
+    "accuracy_mm": "float | null",
+    "noise_level_db": "float | null"
+  },
+  "safety_certifications": [
+    "string"
+  ],
+  "communication_interfaces": [
+    "string"
+  ],
+  "maintenance_interval_hours": "integer | null",
+  "warranty_years": "integer | null"
+}

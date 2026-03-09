@@ -1,0 +1,40 @@
+{
+  "product_name": "GrindPro GP-4080",
+  "manufacturer": "HardEdge Machine Tools Co.",
+  "part_number": "HEM-GP4080-V2",
+  "year_of_manufacture": 2023,
+  "machine_type": "Precision Surface Grinder",
+  "application_sector": "Tool & die making",
+  "power_supply": {
+    "voltage_v": 220,
+    "phases": 1,
+    "frequency_hz": 60,
+    "power_rating_kw": 5.5
+  },
+  "dimensions": {
+    "length_mm": 2032,
+    "width_mm": 1016,
+    "height_mm": 1651
+  },
+  "weight_kg": 3697,
+  "operating_conditions": {
+    "temperature_min_c": 15,
+    "temperature_max_c": 35,
+    "humidity_max_pct": 65
+  },
+  "performance": {
+    "max_speed_rpm": 1450,
+    "throughput": null,
+    "accuracy_mm": 0.005,
+    "noise_level_db": 70
+  },
+  "safety_certifications": [
+    "CE",
+    "ISO 16089"
+  ],
+  "communication_interfaces": [
+    "RS-232"
+  ],
+  "maintenance_interval_hours": 1500,
+  "warranty_years": 2
+}

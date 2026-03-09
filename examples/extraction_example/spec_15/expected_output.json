@@ -1,0 +1,43 @@
+{
+  "product_name": "MillForce MF-1060",
+  "manufacturer": "PrecisaCut Machine Tools S.A.",
+  "part_number": "PCM-MF1060-BT40",
+  "year_of_manufacture": 2024,
+  "machine_type": "Vertical Machining Center",
+  "application_sector": "Precision mechanical engineering",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 30
+  },
+  "dimensions": {
+    "length_mm": 2950,
+    "width_mm": 2200,
+    "height_mm": 2850
+  },
+  "weight_kg": 8400,
+  "operating_conditions": {
+    "temperature_min_c": 10,
+    "temperature_max_c": 40,
+    "humidity_max_pct": 75
+  },
+  "performance": {
+    "max_speed_rpm": 12000,
+    "throughput": null,
+    "accuracy_mm": 0.005,
+    "noise_level_db": 74
+  },
+  "safety_certifications": [
+    "CE",
+    "ISO 13849-1 PLd",
+    "EN 12417"
+  ],
+  "communication_interfaces": [
+    "PROFINET",
+    "MTConnect",
+    "USB"
+  ],
+  "maintenance_interval_hours": 2000,
+  "warranty_years": 2
+}

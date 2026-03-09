@@ -18,9 +18,10 @@ class LogEntry:
     batch_ids: list[str]
     score_before: float | None
     score_after: float | None
-    learnings: str   # What the optimizer learned from this batch
-    issues: str      # Outstanding gaps/contradictions flagged by the optimizer
+    learnings: str       # What the optimizer learned from this batch
     prompt_version: int
+    issues: str = ""     # Outstanding gaps/contradictions flagged by the optimizer; default
+                         # allows loading log entries saved before this field was added
 
     def to_dict(self) -> dict:
         return dataclasses.asdict(self)

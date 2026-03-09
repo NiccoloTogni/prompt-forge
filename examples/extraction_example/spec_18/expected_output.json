@@ -1,0 +1,43 @@
+{
+  "product_name": "BendForce BF-320",
+  "manufacturer": "MetalForm Machinery NV",
+  "part_number": "MFM-BF320-CNC6",
+  "year_of_manufacture": 2024,
+  "machine_type": "CNC Press Brake",
+  "application_sector": "Sheet metal fabrication",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 30
+  },
+  "dimensions": {
+    "length_mm": 4600,
+    "width_mm": 1800,
+    "height_mm": 2900
+  },
+  "weight_kg": 14800,
+  "operating_conditions": {
+    "temperature_min_c": 5,
+    "temperature_max_c": 45,
+    "humidity_max_pct": 80
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": null,
+    "accuracy_mm": 0.02,
+    "noise_level_db": 76
+  },
+  "safety_certifications": [
+    "CE",
+    "EN 12622",
+    "ISO 13849-1 PLd"
+  ],
+  "communication_interfaces": [
+    "PROFINET",
+    "USB",
+    "Ethernet"
+  ],
+  "maintenance_interval_hours": 3000,
+  "warranty_years": 2
+}

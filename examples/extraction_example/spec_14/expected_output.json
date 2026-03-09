@@ -1,0 +1,43 @@
+{
+  "product_name": "ChillPro CHP-150",
+  "manufacturer": "ThermoFlow Cooling Solutions LLC",
+  "part_number": "TFC-CHP150-AW",
+  "year_of_manufacture": 2023,
+  "machine_type": "Air-Cooled Process Chiller",
+  "application_sector": "Automotive supply chain",
+  "power_supply": {
+    "voltage_v": 460,
+    "phases": 3,
+    "frequency_hz": 60,
+    "power_rating_kw": 55
+  },
+  "dimensions": {
+    "length_mm": 2388,
+    "width_mm": 1067,
+    "height_mm": 1829
+  },
+  "weight_kg": 1791,
+  "operating_conditions": {
+    "temperature_min_c": -10,
+    "temperature_max_c": 45,
+    "humidity_max_pct": 95
+  },
+  "performance": {
+    "max_speed_rpm": 3500,
+    "throughput": "25.8 m³/h water flow",
+    "accuracy_mm": null,
+    "noise_level_db": 78
+  },
+  "safety_certifications": [
+    "CE",
+    "UL 474",
+    "ASHRAE 15",
+    "PED 2014/68/EU"
+  ],
+  "communication_interfaces": [
+    "BACnet IP",
+    "Modbus RTU"
+  ],
+  "maintenance_interval_hours": 3000,
+  "warranty_years": 2
+}

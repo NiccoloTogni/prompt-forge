@@ -1,0 +1,32 @@
+CHILLPRO CHP-150 PROCESS CHILLER — DATA SHEET
+
+Mfr: ThermoFlow Cooling Solutions LLC
+Item Number: TFC-CHP150-AW
+Manufacture Date: 2023
+
+Application: The CHP-150 is an air-cooled process chiller for plastic injection molding and die casting cooling circuits, commonly found in the automotive supply chain sector. Cooling capacity: 150 kW at 12°C/35°C (water/ambient).
+
+Power:
+460V 3-phase 60Hz
+Connected load: 55 kW
+
+Size and Weight:
+The chiller measures 94 in. long, 42 in. wide, and 72 in. tall.
+Operating weight: 3,950 lbs
+
+Ambient Conditions:
+The unit is designed for indoor or outdoor (with rain canopy) use.
+Operating ambient: 14 °F to 113 °F.
+Humidity tolerance: up to 95% RH.
+
+Performance:
+Compressor speed: 3,500 RPM
+Water flow rate: 25.8 m³/h
+Noise level: 78 dB(A) at 1m
+
+Regulatory: CE, UL 474, ASHRAE 15 (refrigeration safety), PED 2014/68/EU
+
+Communication: BACnet IP, Modbus RTU
+
+Maintenance: Condenser cleaning and refrigerant check every 3,000 hours.
+Warranty: 2 years compressor, 1 year general parts.

@@ -1,0 +1,36 @@
+TECHNICAL BULLETIN #TB-2024-051
+
+PRODUCT:        MillForce MF-1060 Vertical Machining Center
+MANUFACTURER:   PrecisaCut Machine Tools S.A.
+PART NUMBER:    PCM-MF1060-BT40
+YEAR:           2024
+
+USAGE:          General purpose milling, drilling, and tapping for
+                the precision mechanical engineering sector.
+
+┌──────────────────────────────────────────────────────┐
+│  ELECTRICAL                                          │
+│  Voltage:        400V 3-phase 50Hz                   │
+│  Power:          30 kW (spindle: 22 kW, aux: 8 kW)  │
+├──────────────────────────────────────────────────────┤
+│  DIMENSIONS                                          │
+│  Length:          2,950 mm                            │
+│  Width:           2,200 mm                            │
+│  Height:          2,850 mm                            │
+│  Weight:          8,400 kg                            │
+├──────────────────────────────────────────────────────┤
+│  ENVIRONMENT                                         │
+│  Temp:            10°C to 40°C                        │
+│  Humidity:        max 75%                             │
+├──────────────────────────────────────────────────────┤
+│  PERFORMANCE                                         │
+│  Spindle speed:   12,000 RPM                          │
+│  Rapid feed:      48 m/min                            │
+│  Accuracy:        ±0.005 mm                           │
+│  Noise:           74 dB(A)                            │
+├──────────────────────────────────────────────────────┤
+│  CERTIFICATIONS:  CE, ISO 13849-1 PLd, EN 12417      │
+│  INTERFACES:      PROFINET, MTConnect, USB            │
+│  MAINTENANCE:     Every 2,000 hours                   │
+│  WARRANTY:        2 years                             │
+└──────────────────────────────────────────────────────┘

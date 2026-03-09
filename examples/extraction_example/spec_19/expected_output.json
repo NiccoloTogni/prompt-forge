@@ -1,0 +1,43 @@
+{
+  "product_name": "LogiMove LM-1500",
+  "manufacturer": "SmartTrans Logistics Automation",
+  "part_number": "SLA-LM1500-NAV",
+  "year_of_manufacture": 2024,
+  "machine_type": "Automated Guided Vehicle",
+  "application_sector": "Warehouse and intralogistics",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 4.8
+  },
+  "dimensions": {
+    "length_mm": 1600,
+    "width_mm": 900,
+    "height_mm": 450
+  },
+  "weight_kg": 680,
+  "operating_conditions": {
+    "temperature_min_c": 2,
+    "temperature_max_c": 40,
+    "humidity_max_pct": null
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "40 pallet moves/hour",
+    "accuracy_mm": 10,
+    "noise_level_db": null
+  },
+  "safety_certifications": [
+    "CE",
+    "EN ISO 3691-4",
+    "ISO 13849-1 PLd"
+  ],
+  "communication_interfaces": [
+    "Wi-Fi 5",
+    "PROFINET",
+    "REST API"
+  ],
+  "maintenance_interval_hours": 5000,
+  "warranty_years": 3
+}

@@ -1,0 +1,42 @@
+{
+  "product_name": "AirMax AM-75",
+  "manufacturer": "PneuDrive Systems International",
+  "part_number": "PDS-AM75-VSD",
+  "year_of_manufacture": null,
+  "machine_type": "Rotary Screw Compressor",
+  "application_sector": "General manufacturing",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 75
+  },
+  "dimensions": {
+    "length_mm": 2400,
+    "width_mm": 1350,
+    "height_mm": 1650
+  },
+  "weight_kg": 1980,
+  "operating_conditions": {
+    "temperature_min_c": 2,
+    "temperature_max_c": 46,
+    "humidity_max_pct": 90
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "12.5 m³/min at 8 bar",
+    "accuracy_mm": null,
+    "noise_level_db": 68
+  },
+  "safety_certifications": [
+    "CE",
+    "PED 2014/68/EU",
+    "ISO 8573-1 Class 1.2.1"
+  ],
+  "communication_interfaces": [
+    "Modbus TCP",
+    "Ethernet (web server)"
+  ],
+  "maintenance_interval_hours": 4000,
+  "warranty_years": 5
+}

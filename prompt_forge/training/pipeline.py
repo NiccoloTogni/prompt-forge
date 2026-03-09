@@ -17,11 +17,12 @@ import logging
 from datetime import datetime, timezone
 from typing import Callable
 
-from ..llm.client import LLMClient, LLMMessage
-from ..bundle import BundleCollection, ExampleBundle, is_output_role
+from ..llm.client import LLMClient
+from ..bundle import BundleCollection, ExampleBundle
 from ..file_loaders import FileLoader, get_default_loader
 from ..storage.project_store import ProjectStore, PromptVersion
 from ..evaluation.evaluator import Evaluator, BatchEvalResult
+from ..inference.agent import InferenceAgent
 from .optimizer import PromptOptimizer, OPTIMIZER_TEMPERATURE
 from .batch_strategy import BatchStrategy, RandomBatchStrategy
 from .training_log import TrainingLog, LogEntry
@@ -34,7 +35,7 @@ DEFAULT_MAX_ITERATIONS = 20
 DEFAULT_MIN_IMPROVEMENT = 0.0        # Accept any improvement; ignored when evaluator is None
 DEFAULT_PATIENCE = 5                 # Early-stop after N non-improving iters; ignored when evaluator is None
 DEFAULT_REFINEMENT_THRESHOLD = 0.8   # Scores below this flag refinement_recommended=True
-DEFAULT_INFERENCE_TEMPERATURE = 0.0  # Deterministic inference during evaluation
+DEFAULT_INFERENCE_TEMPERATURE = None  # None = use model default; set to 0.0 for deterministic eval
 MAX_SUMMARY_ENTRIES = 15             # Number of recent iterations to include in optimizer context
 
 
@@ -45,14 +46,15 @@ class TrainingConfig:
     max_iterations: int = DEFAULT_MAX_ITERATIONS
     min_improvement: float = DEFAULT_MIN_IMPROVEMENT  # Ignored when evaluator is None
     patience: int = DEFAULT_PATIENCE                  # Ignored when evaluator is None
-    eval_sample_size: int | None = None   # Examples to evaluate on (None = all)
+    val_size: int | None = None           # Validation set size (sampled once at start; None = all)
+    val_max_tokens: int | None = None     # Max tokens per batch eval call (None = no limit)
     auto_save: bool = True
     output_schema: dict | None = None     # JSON schema if task requires structured output
     refinement_threshold: float = DEFAULT_REFINEMENT_THRESHOLD
     max_tokens: int | None = None         # Per-call context window limit for optimizer
     max_total_tokens: int | None = None   # Total token budget for the whole run
     optimizer_temperature: float = OPTIMIZER_TEMPERATURE  # Temperature for optimizer calls
-    inference_temperature: float = DEFAULT_INFERENCE_TEMPERATURE  # Temperature for eval inference
+    inference_temperature: float | None = DEFAULT_INFERENCE_TEMPERATURE  # None = use model default
 
 
 @dataclasses.dataclass
@@ -147,7 +149,8 @@ class TrainingPipeline:
         self.evaluator = evaluator
         self.file_loader = file_loader or get_default_loader()
         self.context = context
-        self.inference_fn = inference_fn or self._default_inference
+        self._custom_inference_fn = inference_fn  # None → use InferenceAgent (batch-capable)
+        self.inference_fn = inference_fn           # kept for backward compatibility
         self.on_iteration = on_iteration
 
         self.optimizer = optimizer or PromptOptimizer(
@@ -176,8 +179,19 @@ class TrainingPipeline:
             TrainingReport with per-iteration results and refinement signal.
         """
         config = config or TrainingConfig()
-        self._inference_temperature = config.inference_temperature
         results: list[IterationResult] = []
+
+        # Build the eval agent once — reused across all iterations (prompt_text is updated per eval)
+        llm_kwargs = {}
+        if config.inference_temperature is not None:
+            llm_kwargs["temperature"] = config.inference_temperature
+        self._eval_agent = InferenceAgent(
+            llm=self.llm,
+            prompt_text="",  # set per evaluation call
+            file_loader=self.file_loader,
+            llm_kwargs=llm_kwargs,
+            token_estimator=self.optimizer.token_estimator,
+        )
         no_improvement_count = 0
 
         # Get starting prompt
@@ -191,8 +205,11 @@ class TrainingPipeline:
         current_prompt = current.prompt_text
         current_version = current.version
 
+        # Sample the validation set once — reused every iteration for consistent scoring
+        val_bundles = self._sample_val_set(config.val_size)
         logger.info(
             f"Starting training: {len(self.bundles)} examples, "
+            f"val_size={len(val_bundles)}, "
             f"batch_size={config.batch_size}, max_iterations={config.max_iterations}"
         )
 
@@ -211,8 +228,8 @@ class TrainingPipeline:
             # 2. Evaluate current prompt (optional, for scoring)
             score_before = None
             eval_feedback = ""
-            if self.evaluator is not None and config.eval_sample_size != 0:
-                eval_result = self._evaluate_prompt(current_prompt, config.eval_sample_size)
+            if self.evaluator is not None and val_bundles:
+                eval_result = self._evaluate_prompt(current_prompt, val_bundles, config.val_max_tokens)
                 score_before = eval_result.mean_score
                 if eval_result.failed_examples:
                     feedback_lines = [
@@ -245,8 +262,8 @@ class TrainingPipeline:
             score_after = None
             improved = False
             new_eval_result = None
-            if self.evaluator is not None and config.eval_sample_size != 0:
-                new_eval_result = self._evaluate_prompt(opt_result.new_prompt, config.eval_sample_size)
+            if self.evaluator is not None and val_bundles:
+                new_eval_result = self._evaluate_prompt(opt_result.new_prompt, val_bundles, config.val_max_tokens)
                 score_after = new_eval_result.mean_score
                 improved = (
                     score_before is None
@@ -341,59 +358,56 @@ class TrainingPipeline:
             total_tokens_used=self._total_tokens,
         )
 
+    def _sample_val_set(self, val_size: int | None) -> list[ExampleBundle]:
+        """Sample the validation set once at the start of training."""
+        import random
+        bundles = self.bundles.bundles
+        if val_size is not None and val_size < len(bundles):
+            return random.sample(bundles, val_size)
+        return list(bundles)
+
     def _evaluate_prompt(
         self,
         prompt_text: str,
-        sample_size: int | None = None,
+        val_bundles: list[ExampleBundle],
+        val_max_tokens: int | None = None,
     ) -> BatchEvalResult:
-        """Run inference + evaluation on a sample of examples."""
-        bundles = self.bundles.bundles
-        if sample_size and sample_size < len(bundles):
-            import random
-            bundles = random.sample(bundles, sample_size)
+        """Run inference + evaluation on the validation set.
+
+        Uses InferenceAgent.run_bundle_batch (single LLM call) by default.
+        Falls back to sequential calls when a custom inference_fn is set,
+        or if the batch call raises.
+        """
+        from ..bundle import is_output_role
+
+        if self._custom_inference_fn is None:
+            # Default path: batch inference via InferenceAgent
+            self._eval_agent.prompt_text = prompt_text
+            tokens_before = self._eval_agent.tokens_used
+            try:
+                actuals = self._eval_agent.run_bundle_batch(val_bundles, val_max_tokens)
+            except Exception as e:
+                logger.warning(f"Batch inference failed ({e}), falling back to sequential")
+                actuals = [self._eval_agent.run_bundle(b) for b in val_bundles]
+            self._total_tokens += self._eval_agent.tokens_used - tokens_before
+        else:
+            # Custom inference function: always sequential
+            actuals = [self._custom_inference_fn(prompt_text, b) for b in val_bundles]
 
         results = []
-        for bundle in bundles:
+        for bundle, actual in zip(val_bundles, actuals):
             try:
                 contents = bundle.load_contents(self.file_loader)
-                actual = self.inference_fn(prompt_text, bundle)
-                expected = ""
-                # Find the expected output role
-                for role, content in contents.items():
-                    if is_output_role(role):
-                        expected = content.text
-                        break
+                expected = next(
+                    (content.text for role, content in contents.items() if is_output_role(role)),
+                    "",
+                )
                 results.append((bundle.bundle_id, actual, expected))
             except Exception as e:
                 logger.warning(f"Evaluation failed for {bundle.bundle_id}: {e}")
                 results.append((bundle.bundle_id, "", f"[Error: {e}]"))
 
         return self.evaluator.evaluate_batch(results)
-
-    def _default_inference(self, prompt_text: str, bundle: ExampleBundle) -> str:
-        """Default inference: use the LLM with the prompt to process the input."""
-        contents = bundle.load_contents(self.file_loader)
-
-        # Find input role(s) — anything that's not "expected*" or "output*"
-        input_parts = []
-        for role, content in contents.items():
-            if not is_output_role(role):
-                input_parts.append(f"<{role}>\n{content.text}\n</{role}>")
-
-        user_content = "\n\n".join(input_parts)
-
-        messages = [
-            LLMMessage(role="system", content=prompt_text),
-            LLMMessage(role="user", content=user_content),
-        ]
-
-        response = self.llm.complete(messages, temperature=self._inference_temperature)
-        if response.usage:
-            self._total_tokens += (
-                response.usage.get("input_tokens", 0)
-                + response.usage.get("output_tokens", 0)
-            )
-        return response.text
 
     @staticmethod
     def _count_tokens(usage: dict[str, int] | None) -> int:

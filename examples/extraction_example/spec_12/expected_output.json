@@ -1,0 +1,39 @@
+{
+  "product_name": "HydroForce HF-200",
+  "manufacturer": "AquaPump Engineering Ltd.",
+  "part_number": "APE-HF200-SS316",
+  "year_of_manufacture": 2023,
+  "machine_type": "Centrifugal Process Pump",
+  "application_sector": "Chemical processing and water treatment",
+  "power_supply": {
+    "voltage_v": 380,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 22
+  },
+  "dimensions": {
+    "length_mm": 1450,
+    "width_mm": 650,
+    "height_mm": 780
+  },
+  "weight_kg": 385,
+  "operating_conditions": {
+    "temperature_min_c": 5,
+    "temperature_max_c": 45,
+    "humidity_max_pct": null
+  },
+  "performance": {
+    "max_speed_rpm": 2950,
+    "throughput": "200 m³/h at 35m head",
+    "accuracy_mm": null,
+    "noise_level_db": null
+  },
+  "safety_certifications": [
+    "CE",
+    "EN ISO 5199",
+    "ATEX 2014/34/EU"
+  ],
+  "communication_interfaces": [],
+  "maintenance_interval_hours": 6000,
+  "warranty_years": 1
+}

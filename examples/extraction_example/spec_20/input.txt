@@ -1,0 +1,32 @@
+TubeMax TM-76 CNC Tube Bending Machine
+
+Manufactured by BendWorks Machinery Inc.
+SKU: BWM-TM76-3D
+Year of mfg: 2023
+
+Intended for bending steel, stainless, and aluminum tubes up to 76.2 mm (3 in.) OD for the shipbuilding and oil & gas piping sector. The TM-76 features all-electric servo drives with 3D simulation software.
+
+Power
+The machine connects to 480 VAC, 3-phase, 60 Hz. Maximum power draw 25 kW.
+
+Machine Dimensions
+Length: 14 ft 6 in
+Width: 6 ft 3 in
+Height: 7 ft 2 in
+Weight: 9,200 lbs
+
+Operating Environment
+Temperature: 40°F – 110°F
+Humidity: not specified
+
+Performance
+Bending head rotation: 60 RPM max
+Production: approximately 90 bends per hour
+Bending angle accuracy: ±0.1°
+Position accuracy: ±0.05 mm
+Noise: 71 dB(A)
+
+Standards: CE, ASME B31.3 (process piping), EN 12622
+Connectivity: EtherCAT, OPC UA, USB
+Maintenance: 2,500 hours recommended interval
+Warranty: 2 years from commissioning

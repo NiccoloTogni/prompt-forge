@@ -1,0 +1,39 @@
+{
+  "product_name": "OverHead OHC-50",
+  "manufacturer": "LiftCore Crane Systems Ltd.",
+  "part_number": "LCS-OHC50-DG",
+  "year_of_manufacture": 2022,
+  "machine_type": "Double Girder Bridge Crane",
+  "application_sector": "Steel fabrication",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 45
+  },
+  "dimensions": {
+    "length_mm": 22000,
+    "width_mm": 3500,
+    "height_mm": 2200
+  },
+  "weight_kg": 32000,
+  "operating_conditions": {
+    "temperature_min_c": -10,
+    "temperature_max_c": 50,
+    "humidity_max_pct": null
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": null,
+    "accuracy_mm": null,
+    "noise_level_db": 74
+  },
+  "safety_certifications": [
+    "CE Machinery Directive",
+    "EN 15011",
+    "EN 13135"
+  ],
+  "communication_interfaces": [],
+  "maintenance_interval_hours": 2500,
+  "warranty_years": 2
+}

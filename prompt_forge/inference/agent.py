@@ -3,19 +3,26 @@ Inference Agent — uses the trained prompt to perform tasks.
 
 This is the production-facing component. It loads a versioned prompt
 and uses it to process new inputs.
+
+Batch inference:
+    run_batch() — production batch over file/text inputs, single LLM call (chunked if needed)
+    run_bundle_batch() — training/eval batch over ExampleBundle objects, single LLM call
 """
 
 import json
 import logging
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ..llm.client import LLMClient, LLMMessage
 from ..file_loaders import FileLoader, get_default_loader
 from ..storage.project_store import ProjectStore, FileSystemStore
+from ..bundle import ExampleBundle, is_output_role
 
 logger = logging.getLogger(__name__)
+
+TOKEN_CHARS_PER_TOKEN = 4
 
 
 class InferenceAgent:
@@ -23,9 +30,10 @@ class InferenceAgent:
     Uses a trained prompt to perform tasks on new inputs.
 
     Supports:
+        - Single and batch inference (true single-call, not sequential)
+        - Automatic chunking when a token budget is set
+        - ExampleBundle-based inference for training/evaluation pipelines
         - Loading a specific prompt version or the latest
-        - Optional few-shot examples for additional context
-        - Custom pre/post processing
     """
 
     def __init__(
@@ -36,6 +44,7 @@ class InferenceAgent:
         system_suffix: str = "",
         llm_kwargs: dict[str, Any] | None = None,
         output_schema: dict | None = None,
+        token_estimator: Callable[[str], int] | None = None,
     ):
         """
         Args:
@@ -43,7 +52,10 @@ class InferenceAgent:
             prompt_text: The system prompt (usually from a trained version).
             file_loader: FileLoader for reading input files.
             system_suffix: Additional text appended to the system prompt.
-            llm_kwargs: Additional kwargs for llm.complete().
+            llm_kwargs: Additional kwargs for llm.complete() (e.g. temperature).
+            output_schema: If set, outputs are parsed as JSON dicts.
+            token_estimator: Callable for estimating token counts (used for chunking).
+                             Defaults to len(text) // TOKEN_CHARS_PER_TOKEN.
         """
         self.llm = llm
         self.prompt_text = prompt_text
@@ -51,6 +63,10 @@ class InferenceAgent:
         self.system_suffix = system_suffix
         self.llm_kwargs = llm_kwargs or {}
         self.output_schema = output_schema
+        self.token_estimator = token_estimator or (lambda text: len(text) // TOKEN_CHARS_PER_TOKEN)
+        self.tokens_used: int = 0  # cumulative input + output tokens across all calls
+
+    # ── Class methods ─────────────────────────────────────────────────────────
 
     @classmethod
     def from_store(
@@ -59,7 +75,7 @@ class InferenceAgent:
         store: ProjectStore,
         version: int | None = None,
         **kwargs,
-    ) -> InferenceAgent:
+    ) -> "InferenceAgent":
         """
         Create an InferenceAgent from a stored prompt version.
 
@@ -80,15 +96,10 @@ class InferenceAgent:
 
         logger.info(f"Loaded prompt version {prompt_version.version} (score: {prompt_version.eval_score})")
 
-        # Carry output_schema from the stored version unless caller overrides it
         if "output_schema" not in kwargs:
             kwargs["output_schema"] = prompt_version.output_schema
 
-        return cls(
-            llm=llm,
-            prompt_text=prompt_version.prompt_text,
-            **kwargs,
-        )
+        return cls(llm=llm, prompt_text=prompt_version.prompt_text, **kwargs)
 
     @classmethod
     def from_project_dir(
@@ -97,12 +108,12 @@ class InferenceAgent:
         project_dir: str | Path,
         version: int | None = None,
         **kwargs,
-    ) -> InferenceAgent:
-        """
-        Convenience: create from a filesystem project directory.
-        """
+    ) -> "InferenceAgent":
+        """Convenience: create from a filesystem project directory."""
         store = FileSystemStore(project_dir)
         return cls.from_store(llm=llm, store=store, version=version, **kwargs)
+
+    # ── Public inference API ──────────────────────────────────────────────────
 
     def run(
         self,
@@ -110,7 +121,7 @@ class InferenceAgent:
         input_file: str | Path | None = None,
         input_files: dict[str, str | Path] | None = None,
         extra_context: str = "",
-    ) -> str | dict:
+    ) -> "str | dict":
         """
         Run inference on a new input.
 
@@ -122,43 +133,213 @@ class InferenceAgent:
         Returns:
             A dict if output_schema is set (JSON parsed), otherwise a plain string.
         """
-        # Build system prompt
+        user_content = self._build_user_content(input_text, input_file, input_files, extra_context)
+        response = self._call_single(self._build_system(), user_content)
+        return self._post_process(response.text)
+
+    def run_batch(
+        self,
+        inputs: list[dict],
+        max_tokens: int | None = None,
+    ) -> "list[str | dict]":
+        """
+        Run inference on multiple inputs in a single LLM call (chunked if max_tokens is set).
+
+        Args:
+            inputs: List of dicts, each with keys matching run() parameters
+                    (e.g., {"input_file": "path/to/file.pdf"}).
+            max_tokens: Token budget per LLM call. If None, all inputs are sent at once.
+
+        Returns:
+            List of outputs — strings, or dicts when output_schema is set.
+        """
+        user_contents = [self._build_user_content(**kw) for kw in inputs]
+        raw_outputs = self._batch_call(user_contents, max_tokens)
+        return [self._post_process(o) for o in raw_outputs]
+
+    def run_bundle(self, bundle: ExampleBundle) -> str:
+        """
+        Run inference on a single ExampleBundle (input roles only, no JSON parsing).
+
+        Intended for training/evaluation pipelines where the evaluator handles
+        output parsing. Always returns a plain string with code fences stripped.
+        """
+        user_content = self._bundle_to_user_content(bundle)
+        response = self._call_single(self._build_system(), user_content)
+        return self._strip_code_fences(response.text)
+
+    def run_bundle_batch(
+        self,
+        bundles: list[ExampleBundle],
+        max_tokens: int | None = None,
+    ) -> list[str]:
+        """
+        Run batch inference on ExampleBundles in a single LLM call (chunked if needed).
+
+        Intended for training/evaluation pipelines. Always returns plain strings
+        (code fences stripped) — the evaluator handles output parsing.
+
+        Args:
+            bundles: List of ExampleBundle objects.
+            max_tokens: Token budget per LLM call. If None, all bundles are sent at once.
+
+        Returns:
+            List of output strings in the same order as the input bundles.
+        """
+        user_contents = [self._bundle_to_user_content(b) for b in bundles]
+        return self._batch_call(user_contents, max_tokens)
+
+    # ── Internal: batch call ──────────────────────────────────────────────────
+
+    def _batch_call(self, user_contents: list[str], max_tokens: int | None) -> list[str]:
+        """Single-call (or chunked) batch over pre-built user content strings."""
+        if not user_contents:
+            return []
+        if max_tokens is not None:
+            return self._chunked_batch(user_contents, max_tokens)
+        return self._single_batch_call(user_contents)
+
+    def _single_batch_call(self, user_contents: list[str]) -> list[str]:
+        """Send all inputs in one LLM call; parse per-output XML tags."""
+        n = len(user_contents)
+        input_blocks = "\n\n".join(
+            f'<input id="{i}">\n{content}\n</input>'
+            for i, content in enumerate(user_contents, 1)
+        )
+        expected_fmt = "\n".join(
+            f'<output id="{i}">your output for input {i}</output>'
+            for i in range(1, n + 1)
+        )
+        user_message = (
+            f"You will receive {n} independent inputs. Process each one according to your "
+            f"instructions and produce an output for every input.\n\n"
+            f"Respond using EXACTLY this format — one block per input, in order:\n\n"
+            f"{expected_fmt}\n\n"
+            f"{input_blocks}"
+        )
+        response = self._call_single(self._build_system(), user_message)
+
+        outputs = []
+        for i in range(1, n + 1):
+            match = re.search(rf'<output id="{i}">(.*?)</output>', response.text, re.DOTALL)
+            outputs.append(self._strip_code_fences(match.group(1).strip()) if match else "")
+
+        missing = sum(1 for o in outputs if not o)
+        if missing:
+            logger.warning(f"Batch inference: {missing}/{n} outputs missing or empty")
+
+        return outputs
+
+    def _chunked_batch(self, user_contents: list[str], max_tokens: int) -> list[str]:
+        """Group inputs into token-budget chunks and run one batch call per chunk."""
+        system_tokens = self.token_estimator(self._build_system())
+        instruction_overhead = 300  # conservative estimate for batch wrapper text
+        available = max_tokens - system_tokens - instruction_overhead
+
+        if available <= 0:
+            raise ValueError(
+                f"System prompt alone ({system_tokens} tokens) exceeds "
+                f"max_tokens={max_tokens}. Increase the token budget."
+            )
+
+        chunks: list[list[str]] = []
+        current_chunk: list[str] = []
+        current_tokens = 0
+
+        for content in user_contents:
+            tokens = self.token_estimator(content)
+            if tokens > available:
+                raise ValueError(
+                    f"A single input ({tokens} tokens) exceeds the per-chunk budget "
+                    f"({available} tokens). Increase max_tokens."
+                )
+            if current_tokens + tokens > available and current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = []
+                current_tokens = 0
+            current_chunk.append(content)
+            current_tokens += tokens
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        logger.info(f"Batch inference: {len(user_contents)} inputs → {len(chunks)} chunk(s)")
+        all_outputs: list[str] = []
+        for chunk in chunks:
+            all_outputs.extend(self._single_batch_call(chunk))
+        return all_outputs
+
+    # ── Internal: helpers ─────────────────────────────────────────────────────
+
+    def _call_single(self, system: str, user_content: str):
+        """Make a single LLM call and accumulate token usage."""
+        messages = [
+            LLMMessage(role="system", content=system),
+            LLMMessage(role="user", content=user_content),
+        ]
+        response = self.llm.complete(messages, **self.llm_kwargs)
+        if response.usage:
+            self.tokens_used += (
+                response.usage.get("input_tokens", 0) + response.usage.get("output_tokens", 0)
+            )
+        return response
+
+    def _build_system(self) -> str:
         system = self.prompt_text
         if self.output_schema:
             system += "\n\nRespond ONLY with valid JSON. Do not include any explanation or text outside the JSON object."
         if self.system_suffix:
             system += "\n\n" + self.system_suffix
+        return system
 
-        # Build messages
-        messages = [LLMMessage(role="system", content=system)]
-
-        # Build user message
-        user_content = self._build_user_content(
-            input_text=input_text,
-            input_file=input_file,
-            input_files=input_files,
-            extra_context=extra_context,
+    def _bundle_to_user_content(self, bundle: ExampleBundle) -> str:
+        contents = bundle.load_contents(self.file_loader)
+        return "\n\n".join(
+            f"<{role}>\n{content.text}\n</{role}>"
+            for role, content in contents.items()
+            if not is_output_role(role)
         )
-        messages.append(LLMMessage(role="user", content=user_content))
 
-        # Call LLM
-        response = self.llm.complete(messages, **self.llm_kwargs)
-
+    def _post_process(self, text: str) -> "str | dict":
+        """Parse JSON if output_schema is set; otherwise strip code fences."""
         if self.output_schema is not None:
-            return self._extract_json(response.text)
-        return response.text
+            return self._extract_json(text)
+        return self._strip_code_fences(text)
+
+    def _build_user_content(
+        self,
+        input_text: str | None = None,
+        input_file: str | Path | None = None,
+        input_files: dict[str, str | Path] | None = None,
+        extra_context: str = "",
+    ) -> str:
+        parts = []
+        if extra_context:
+            parts.append(f"<additional_context>\n{extra_context}\n</additional_context>")
+        if input_text:
+            parts.append(input_text)
+        elif input_file:
+            content = self.file_loader.load(input_file)
+            parts.append(f"<input>\n{content.text}\n</input>")
+        elif input_files:
+            for role, path in input_files.items():
+                content = self.file_loader.load(path)
+                parts.append(f"<{role}>\n{content.text}\n</{role}>")
+        else:
+            raise ValueError("Provide one of: input_text, input_file, or input_files")
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _strip_code_fences(text: str) -> str:
+        stripped = text.strip()
+        match = re.search(r"```(?:\w+)?\s*\n?([\s\S]*?)\s*```", stripped)
+        return match.group(1).strip() if match else stripped
 
     @staticmethod
     def _extract_json(text: str) -> dict:
-        """
-        Parse JSON from LLM output, handling markdown code fences.
-
-        Raises:
-            ValueError: If the text cannot be parsed as a JSON object.
-        """
+        """Parse JSON from LLM output, handling markdown code fences."""
         stripped = text.strip()
-        # Strip ```json ... ``` or ``` ... ``` fences
-        fence_match = re.match(r"^```(?:json)?\s*([\s\S]*?)\s*```$", stripped)
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped)
         if fence_match:
             stripped = fence_match.group(1).strip()
         try:
@@ -172,57 +353,6 @@ class InferenceAgent:
                 f"Expected a JSON object but got {type(result).__name__}.\nRaw output:\n{text}"
             )
         return result
-
-    def run_batch(
-        self,
-        inputs: list[dict],
-    ) -> list[str | dict]:
-        """
-        Run inference on multiple inputs.
-
-        Args:
-            inputs: List of dicts, each with keys matching run() parameters
-                    (e.g., {"input_file": "path/to/file.pdf"}).
-
-        Returns:
-            List of outputs — strings, or dicts when output_schema is set.
-        """
-        results = []
-        for i, input_kwargs in enumerate(inputs):
-            logger.info(f"Processing input {i+1}/{len(inputs)}")
-            try:
-                result = self.run(**input_kwargs)
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Failed on input {i+1}: {e}")
-                results.append(f"[Error: {e}]")
-        return results
-
-    def _build_user_content(
-        self,
-        input_text: str | None = None,
-        input_file: str | Path | None = None,
-        input_files: dict[str, str | Path] | None = None,
-        extra_context: str = "",
-    ) -> str:
-        parts = []
-
-        if extra_context:
-            parts.append(f"<additional_context>\n{extra_context}\n</additional_context>")
-
-        if input_text:
-            parts.append(input_text)
-        elif input_file:
-            content = self.file_loader.load(input_file)
-            parts.append(f"<input>\n{content.text}\n</input>")
-        elif input_files:
-            for role, path in input_files.items():
-                content = self.file_loader.load(path)
-                parts.append(f"<{role}>\n{content.text}\n</{role}>")
-        else:
-            raise ValueError("Provide one of: input_text, input_file, or input_files")
-
-        return "\n\n".join(parts)
 
     @property
     def prompt_info(self) -> str:

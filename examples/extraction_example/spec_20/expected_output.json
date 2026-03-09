@@ -1,0 +1,43 @@
+{
+  "product_name": "TubeMax TM-76",
+  "manufacturer": "BendWorks Machinery Inc.",
+  "part_number": "BWM-TM76-3D",
+  "year_of_manufacture": 2023,
+  "machine_type": "CNC Tube Bending Machine",
+  "application_sector": "Shipbuilding and oil & gas piping",
+  "power_supply": {
+    "voltage_v": 480,
+    "phases": 3,
+    "frequency_hz": 60,
+    "power_rating_kw": 25
+  },
+  "dimensions": {
+    "length_mm": 4420,
+    "width_mm": 1905,
+    "height_mm": 2184
+  },
+  "weight_kg": 4173,
+  "operating_conditions": {
+    "temperature_min_c": 4.4,
+    "temperature_max_c": 43.3,
+    "humidity_max_pct": null
+  },
+  "performance": {
+    "max_speed_rpm": 60,
+    "throughput": "90 bends/hour",
+    "accuracy_mm": 0.05,
+    "noise_level_db": 71
+  },
+  "safety_certifications": [
+    "CE",
+    "ASME B31.3",
+    "EN 12622"
+  ],
+  "communication_interfaces": [
+    "EtherCAT",
+    "OPC UA",
+    "USB"
+  ],
+  "maintenance_interval_hours": 2500,
+  "warranty_years": 2
+}

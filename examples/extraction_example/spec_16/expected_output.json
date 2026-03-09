@@ -1,0 +1,41 @@
+{
+  "product_name": "SparkLine SL-320",
+  "manufacturer": "ElectroCut Precision Technologies",
+  "part_number": "EPT-SL320-CNC",
+  "year_of_manufacture": 2024,
+  "machine_type": "Wire EDM Machine",
+  "application_sector": "Mold & die and medical device manufacturing",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 15
+  },
+  "dimensions": {
+    "length_mm": 2100,
+    "width_mm": 1800,
+    "height_mm": 2200
+  },
+  "weight_kg": 3200,
+  "operating_conditions": {
+    "temperature_min_c": 15,
+    "temperature_max_c": 35,
+    "humidity_max_pct": 60
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": null,
+    "accuracy_mm": 0.002,
+    "noise_level_db": 62
+  },
+  "safety_certifications": [
+    "CE",
+    "EN 12957"
+  ],
+  "communication_interfaces": [
+    "PROFINET",
+    "USB"
+  ],
+  "maintenance_interval_hours": 2000,
+  "warranty_years": 2
+}

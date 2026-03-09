@@ -1,0 +1,42 @@
+{
+  "product_name": "PlasmaCut PC-3060",
+  "manufacturer": "CutRight Industrial Technologies",
+  "part_number": "CRT-PC3060-HD",
+  "year_of_manufacture": 2024,
+  "machine_type": "CNC Plasma Cutting Table",
+  "application_sector": "Steel service centers",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 62
+  },
+  "dimensions": {
+    "length_mm": 8200,
+    "width_mm": 4100,
+    "height_mm": 2300
+  },
+  "weight_kg": 7800,
+  "operating_conditions": {
+    "temperature_min_c": 5,
+    "temperature_max_c": 40,
+    "humidity_max_pct": 80
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "25 parts/hour",
+    "accuracy_mm": 0.5,
+    "noise_level_db": 84
+  },
+  "safety_certifications": [
+    "CE",
+    "EN ISO 11553-1",
+    "EN 12584"
+  ],
+  "communication_interfaces": [
+    "EtherCAT",
+    "Ethernet"
+  ],
+  "maintenance_interval_hours": 2000,
+  "warranty_years": 2
+}

@@ -1,0 +1,43 @@
+{
+  "product_name": "WrapLine WL-500",
+  "manufacturer": "PackFlow Automation GmbH",
+  "part_number": "PFA-WL500-MK3",
+  "year_of_manufacture": 2023,
+  "machine_type": "Horizontal Flow Wrapper",
+  "application_sector": "Food processing",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 12
+  },
+  "dimensions": {
+    "length_mm": 2800,
+    "width_mm": 1100,
+    "height_mm": 1700
+  },
+  "weight_kg": null,
+  "operating_conditions": {
+    "temperature_min_c": 10,
+    "temperature_max_c": 38,
+    "humidity_max_pct": 80
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "250 packs/min",
+    "accuracy_mm": 0.5,
+    "noise_level_db": 73
+  },
+  "safety_certifications": [
+    "CE",
+    "EN 415-1",
+    "EHEDG"
+  ],
+  "communication_interfaces": [
+    "EtherCAT",
+    "PROFINET",
+    "OPC UA"
+  ],
+  "maintenance_interval_hours": null,
+  "warranty_years": 1
+}

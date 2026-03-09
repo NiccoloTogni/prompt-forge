@@ -1,0 +1,40 @@
+{
+  "product_name": "PyroMax PM-1200",
+  "manufacturer": "HeatTech Thermal Equipment",
+  "part_number": "HTE-PM1200-EL",
+  "year_of_manufacture": 2023,
+  "machine_type": "Industrial Batch Furnace",
+  "application_sector": "Automotive and aerospace heat treatment",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 120
+  },
+  "dimensions": {
+    "length_mm": 3500,
+    "width_mm": 2200,
+    "height_mm": 2800
+  },
+  "weight_kg": 6500,
+  "operating_conditions": {
+    "temperature_min_c": 10,
+    "temperature_max_c": 40,
+    "humidity_max_pct": 75
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "3 loads/day",
+    "accuracy_mm": null,
+    "noise_level_db": 55
+  },
+  "safety_certifications": [
+    "CE",
+    "EN 746-1",
+    "AMS 2750F",
+    "NADCAP"
+  ],
+  "communication_interfaces": [],
+  "maintenance_interval_hours": 4000,
+  "warranty_years": 3
+}

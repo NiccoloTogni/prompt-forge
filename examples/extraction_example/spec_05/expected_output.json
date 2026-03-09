@@ -1,0 +1,43 @@
+{
+  "product_name": "InjectorMax IM-850T",
+  "manufacturer": "PlastiForce Technologies Inc.",
+  "part_number": "PFT-IM850T-S",
+  "year_of_manufacture": 2024,
+  "machine_type": "Injection Molding Machine",
+  "application_sector": "Consumer electronics",
+  "power_supply": {
+    "voltage_v": 460,
+    "phases": 3,
+    "frequency_hz": 60,
+    "power_rating_kw": 92
+  },
+  "dimensions": {
+    "length_mm": 6800,
+    "width_mm": 2100,
+    "height_mm": 2500
+  },
+  "weight_kg": 28000,
+  "operating_conditions": {
+    "temperature_min_c": 10,
+    "temperature_max_c": 40,
+    "humidity_max_pct": 70
+  },
+  "performance": {
+    "max_speed_rpm": 250,
+    "throughput": "120 shots/hour",
+    "accuracy_mm": 0.03,
+    "noise_level_db": 76
+  },
+  "safety_certifications": [
+    "UL",
+    "CE",
+    "EN 201",
+    "ANSI/NFPA 79"
+  ],
+  "communication_interfaces": [
+    "EUROMAP 77 (OPC UA)",
+    "CC-Link IE"
+  ],
+  "maintenance_interval_hours": 5000,
+  "warranty_years": 2
+}

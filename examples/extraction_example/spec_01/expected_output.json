@@ -1,0 +1,43 @@
+{
+  "product_name": "TITAN HP-3000",
+  "manufacturer": "ForgeLine Heavy Industries",
+  "part_number": "FLH-HP3000-A2",
+  "year_of_manufacture": 2023,
+  "machine_type": "Hydraulic Press",
+  "application_sector": "Automotive stamping",
+  "power_supply": {
+    "voltage_v": 400,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 55
+  },
+  "dimensions": {
+    "length_mm": 3200,
+    "width_mm": 2100,
+    "height_mm": 4500
+  },
+  "weight_kg": 18500,
+  "operating_conditions": {
+    "temperature_min_c": 5,
+    "temperature_max_c": 45,
+    "humidity_max_pct": 80
+  },
+  "performance": {
+    "max_speed_rpm": null,
+    "throughput": "12 cycles/min",
+    "accuracy_mm": 0.05,
+    "noise_level_db": 78
+  },
+  "safety_certifications": [
+    "CE",
+    "ISO 13849-1 PLd",
+    "EN 693"
+  ],
+  "communication_interfaces": [
+    "PROFINET",
+    "EtherCAT",
+    "OPC UA"
+  ],
+  "maintenance_interval_hours": 4000,
+  "warranty_years": 2
+}

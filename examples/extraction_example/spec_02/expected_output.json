@@ -1,0 +1,42 @@
+{
+  "product_name": "SPINMAX CL-600",
+  "manufacturer": "KronoWerk Precision Machines GmbH",
+  "part_number": "KWP-CL600-R3",
+  "year_of_manufacture": 2024,
+  "machine_type": "CNC Turning Center",
+  "application_sector": "Aerospace component manufacturing",
+  "power_supply": {
+    "voltage_v": 380,
+    "phases": 3,
+    "frequency_hz": 50,
+    "power_rating_kw": 37
+  },
+  "dimensions": {
+    "length_mm": 2800,
+    "width_mm": 1750,
+    "height_mm": 1950
+  },
+  "weight_kg": 6200,
+  "operating_conditions": {
+    "temperature_min_c": 10,
+    "temperature_max_c": 40,
+    "humidity_max_pct": 75
+  },
+  "performance": {
+    "max_speed_rpm": 4500,
+    "throughput": "45 parts/hour",
+    "accuracy_mm": 0.008,
+    "noise_level_db": 72
+  },
+  "safety_certifications": [
+    "CE",
+    "ISO 13849-1 PLc",
+    "EN 12415"
+  ],
+  "communication_interfaces": [
+    "PROFINET",
+    "MTConnect"
+  ],
+  "maintenance_interval_hours": 3000,
+  "warranty_years": 2
+}

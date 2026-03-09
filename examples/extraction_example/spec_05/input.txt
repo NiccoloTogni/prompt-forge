@@ -1,0 +1,32 @@
+InjectorMax IM-850T | Injection Molding Machine
+================================================
+Mfg: PlastiForce Technologies Inc.
+P/N: PFT-IM850T-S
+Built: 2024
+
+Purpose-built for high-volume thermoplastic part production in the consumer electronics sector. The IM-850T offers 850 tonnes of clamping force with a shot weight up to 4,200 grams (PS equivalent).
+
+ELECTRICAL DATA
+Supply: 460 V / 3-ph / 60 Hz
+Power consumption: 92 kW
+
+SIZE & WEIGHT
+The machine measures 680 cm (L) × 210 cm (W) × 250 cm (H).
+Weight: 28 metric tons.
+
+AMBIENT CONDITIONS
+Operating temperature range: 50 °F to 104 °F
+Max humidity: 70%
+
+OUTPUT METRICS
+- Screw speed up to 250 RPM
+- Output rate: 120 shots/hour
+- Part tolerance: ±0.03 mm
+- Noise level: 76 dBA
+
+COMPLIANCE
+UL Listed, CE, EN 201 (safety of injection moulding machines), ANSI/NFPA 79
+
+COMMUNICATIONS: EUROMAP 77 (OPC UA), CC-Link IE
+
+SERVICING: Every 5,000 hours. WARRANTY: 1 year parts, 2 years labor.

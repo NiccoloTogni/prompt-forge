@@ -1,0 +1,43 @@
+{
+  "product_name": "FlexArm RA-220",
+  "manufacturer": "RoboMotion AG",
+  "part_number": "RM-RA220-6AX",
+  "year_of_manufacture": 2024,
+  "machine_type": "Industrial Articulated Robot",
+  "application_sector": "Food & beverage packaging",
+  "power_supply": {
+    "voltage_v": 480,
+    "phases": 3,
+    "frequency_hz": 60,
+    "power_rating_kw": 8.5
+  },
+  "dimensions": {
+    "length_mm": 800,
+    "width_mm": 800,
+    "height_mm": 2350
+  },
+  "weight_kg": 1150,
+  "operating_conditions": {
+    "temperature_min_c": 0,
+    "temperature_max_c": 45,
+    "humidity_max_pct": 85
+  },
+  "performance": {
+    "max_speed_rpm": 30,
+    "throughput": "1200 picks/hour",
+    "accuracy_mm": 0.06,
+    "noise_level_db": 65
+  },
+  "safety_certifications": [
+    "CE Machinery Directive 2006/42/EC",
+    "ISO 10218-1",
+    "EN ISO 13849-1 PLd"
+  ],
+  "communication_interfaces": [
+    "EtherNet/IP",
+    "PROFINET",
+    "DeviceNet"
+  ],
+  "maintenance_interval_hours": 5000,
+  "warranty_years": 3
+}

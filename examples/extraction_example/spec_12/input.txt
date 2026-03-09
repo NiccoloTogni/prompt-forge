@@ -1,0 +1,30 @@
+HydroForce HF-200 Centrifugal Process Pump
+
+Technical Bulletin - Rev. 4
+
+Maker: AquaPump Engineering Ltd.
+Catalogue no.: APE-HF200-SS316
+Year of mfg: 2023
+
+Application: The HF-200 is a single-stage, end-suction centrifugal pump for chemical processing and water treatment applications. Wetted parts are constructed from 316L stainless steel for corrosion resistance.
+
+Electrical
+  380V 3-phase 50Hz supply
+  Motor rated at 22 kW (IE3 efficiency)
+
+Size
+  Pump + baseplate: 1,450 mm (L) × 650 mm (W) × 780 mm (H)
+  Dry weight: 385 kg
+
+Temperature limits
+  Process fluid temperature: -10°C to +120°C
+  Ambient: 5°C minimum, 45°C maximum
+
+Performance
+  Impeller speed: 2,950 RPM
+  Flow rate: 200 m³/h at 35m head
+  
+Certified to CE, EN ISO 5199 (technical specifications for centrifugal pumps), ATEX 2014/34/EU (Zone 2)
+
+Service: Mechanical seal inspection every 6,000 hours
+Warranty: 18 months from delivery

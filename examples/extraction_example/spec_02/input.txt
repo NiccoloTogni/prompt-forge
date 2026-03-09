@@ -1,0 +1,32 @@
+PRODUCT SPECIFICATION
+======================
+
+Product: SPINMAX CL-600 CNC Turning Center
+Made by: KronoWerk Precision Machines GmbH
+Catalog Reference: KWP-CL600-R3
+Production Year: 2024
+
+DESCRIPTION
+The SPINMAX CL-600 is a slant-bed CNC lathe with live tooling, primarily used in aerospace component manufacturing. It features a 12-station turret with driven tools and a bar feeder interface.
+
+ELECTRICAL REQUIREMENTS
+Mains voltage is 380V three-phase at 50 Hz. Total connected load amounts to 37 kW.
+
+MACHINE ENVELOPE
+Length: 2.8 m | Width: 1.75 m | Height: 1.95 m
+Shipping weight approximately 6200 kg.
+
+ENVIRONMENTAL LIMITS
+The machine should be operated between 10°C and 40°C. Humidity must stay below 75% (non-condensing).
+
+KEY PERFORMANCE DATA
+- Spindle max speed: 4500 RPM
+- Production rate: 45 parts/hour
+- Positional accuracy: 0.008 mm
+- Acoustic emission: 72 dB(A)
+
+The CL-600 is CE marked and conforms to ISO 13849-1 (Performance Level c) and EN 12415 (safety of turning machines).
+
+Interfaces available: PROFINET and MTConnect.
+
+Regular preventive maintenance is advised every 3000 hours of operation. Standard warranty covers 2 years from date of commissioning.

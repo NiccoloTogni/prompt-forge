@@ -298,7 +298,6 @@ Respond in this exact JSON format (no other text):
 
         response = self.llm.complete(
             messages=[LLMMessage(role="user", content=judge_prompt)],
-            temperature=0.0,
         )
 
         try:

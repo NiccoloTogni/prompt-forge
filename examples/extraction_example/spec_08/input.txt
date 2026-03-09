@@ -1,0 +1,34 @@
+PRODUCT BULLETIN
+
+AirMax AM-75 Rotary Screw Compressor
+
+Distributed by: PneuDrive Systems International
+Cat. No.: PDS-AM75-VSD
+
+APPLICATION: General-purpose compressed air supply for paint shops, pneumatic tooling, and process air in general manufacturing plants.
+
+POWER INPUT
+The compressor requires 400 V AC three-phase 50 Hz power supply.
+Rated motor power: 75 kW (VSD driven).
+
+FOOTPRINT AND WEIGHT
+Unit dimensions: L 2400 mm × W 1350 mm × H 1650 mm
+Operating weight (with oil charge): 1,980 kg
+
+ENVIRONMENTAL RATING
+Min operating temperature: 2°C
+Max operating temperature: 46°C
+Max ambient humidity: 90%
+
+KEY OUTPUTS
+Free Air Delivery: 12.5 m³/min at 8 bar
+Noise level: 68 dB(A) per ISO 2151
+
+CERTIFICATIONS
+CE, PED 2014/68/EU, ISO 8573-1 Class 1.2.1
+
+CONNECTIVITY
+Modbus TCP, built-in web server (Ethernet RJ45)
+
+MAINTENANCE
+Filter and oil service every 4,000 hours. Extended warranty available: up to 5 years.

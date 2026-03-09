@@ -1,0 +1,34 @@
+LaserTech LT-6025 Fiber Laser Cutting System
+
+MANUFACTURER: PhotonCut Industrial Lasers S.p.A.
+ARTICLE NUMBER: PCI-LT6025-F8
+YEAR: 2024
+
+Overview: The LT-6025 is a flat-bed fiber laser cutter with 8 kW resonator, engineered for high-speed sheet metal processing in the HVAC and elevator panel fabrication sector. Cutting area is 6,000 × 2,500 mm.
+
+Electrical Data:
+  - Voltage: 400 V, three-phase, 50 Hz
+  - Consumption: 45 kW average, 68 kW peak
+
+Machine Dimensions:
+  Length = 11.2 m, Width = 3.8 m, Height = 2.15 m
+Weight: 13,600 kg
+
+Environment:
+  Temp range: 41°F – 95°F
+  Humidity: ≤70% non-condensing
+
+Performance:
+  Rapid traverse: 140 m/min (simultaneous XY)
+  Cutting speed (1mm mild steel): 40 m/min
+  Throughput: up to 180 parts/hour (application dependent)
+  Positioning accuracy: ±0.03 mm
+  Noise: 75 dB(A) during cutting
+
+Standards & Approvals:
+  CE, EN ISO 11553-1 (laser safety), IEC 60825-1 Class 4
+
+Interfaces: PROFINET, OPC UA, USB (for offline programs)
+
+Maintenance: 2,500 hours for resonator service, 1,000 hours for general inspection.
+Warranty: 2 years machine, 3 years laser source.

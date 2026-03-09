@@ -1,0 +1,33 @@
+WeldMaster WM-R400 Robotic Welding Cell
+Product Information Sheet
+
+Integrator: ArcFusion Welding Systems
+Part #: AFS-WMR400-MIG
+Year: 2024
+
+The WM-R400 is a fully enclosed robotic MIG/MAG welding cell featuring a 6-axis welding robot with 2-axis headstock/tailstock positioner. It is designed for structural steel welding in the construction and heavy equipment sectors.
+
+Power:
+Input 480V AC, 3 phases, 60 Hz. Total installed power including welding source: 85 kW.
+
+Physical Data:
+Cell footprint (L×W): 4.5 m × 3.2 m
+Cell height: 2.8 m
+Weight: approx. 5.5 tons (complete cell)
+
+Environment:
+Working temperature: 0 °C to 40 °C
+Humidity: up to 90% non-condensing
+
+Performance:
+Robot max speed: 2,000 mm/s (TCP)
+Duty cycle throughput: 18 assemblies per shift (8h)
+Weld seam accuracy: ±0.3 mm (after TCP calibration)
+Sound level: 80 dB(A) with enclosure doors closed
+
+Safety: CE, ISO 10218-2 (robot system integration), EN ISO 11611 (welding environment)
+
+Interfaces: EtherNet/IP to cell PLC, PROFINET to plant SCADA
+
+Service interval: 3,000 hours for robot, 1,000 hours for torch consumables
+Standard warranty: 2 years

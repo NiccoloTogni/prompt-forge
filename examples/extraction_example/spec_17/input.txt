@@ -1,0 +1,30 @@
+PRODUCT DATA: PYROMAX PM-1200 INDUSTRIAL BATCH FURNACE
+
+Made by HeatTech Thermal Equipment
+Ident: HTE-PM1200-EL
+Year of production: 2023
+
+The PM-1200 is an electrically heated batch furnace used for heat treatment processes (hardening, tempering, annealing) in the automotive and aerospace heat treatment sector. Maximum operating temperature is 1,200 °C.
+
+ELECTRICAL
+Supply: 400 V / 3-phase / 50 Hz
+Heating elements: 120 kW total (6 × 20 kW SiC rod elements)
+
+DIMENSIONS
+External: 3,500 mm (L) × 2,200 mm (W) × 2,800 mm (H)
+Weight: 6,500 kg
+
+OPERATIONAL ENVIRONMENT
+Installed in climate-controlled facility: 10°C to 40°C ambient. Humidity below 75%.
+
+OUTPUT DATA
+Heating rate: 300 °C/hour (loaded)
+Temperature uniformity: ±5 °C within working zone (per AMS 2750F Class 2)
+Cycle throughput: 3 loads/day (depending on recipe)
+Noise: 55 dB(A) — primarily from cooling fans
+
+CERTIFICATIONS
+CE, EN 746-1 (industrial thermoprocessing equipment), AMS 2750F (pyrometry), NADCAP accredited process
+
+MAINTENANCE: Every 4,000 hours (element inspection, thermocouple recalibration)
+WARRANTY: 3 years on chamber, 1 year on heating elements
