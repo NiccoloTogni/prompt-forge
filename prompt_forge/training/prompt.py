@@ -29,5 +29,22 @@ CRITICAL RULES:
   Bad: "Pay attention to the format"
   Good: "The date field must be in DD/MM/YYYY format. If the source uses MM/DD/YYYY, convert it."
 
-Respond with ONLY the improved system prompt text, nothing else.
-Do not wrap it in markdown code fences or add any preamble."""
+Respond using EXACTLY this structure — do not add any text outside the tags:
+
+<optimized_prompt>
+The full improved system prompt text goes here.
+</optimized_prompt>
+
+<learnings>
+Concise bullet points (2-5) summarizing what new rules or patterns were discovered
+from this batch. Focus on WHAT was learned, not how the prompt changed syntactically.
+</learnings>
+
+<issues>
+Bullet points listing any problems that could NOT be fully addressed:
+- Missing information in the examples (e.g. ambiguous expected outputs)
+- Contradictions between examples
+- Edge cases that need more examples to resolve
+- Anything that requires human clarification
+Write "None" if there are no outstanding issues.
+</issues>"""

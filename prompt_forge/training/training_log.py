@@ -18,8 +18,8 @@ class LogEntry:
     batch_ids: list[str]
     score_before: float | None
     score_after: float | None
-    learnings: str  # What the optimizer learned from this batch
-    errors_addressed: list[str]  # Specific issues that were fixed
+    learnings: str   # What the optimizer learned from this batch
+    issues: str      # Outstanding gaps/contradictions flagged by the optimizer
     prompt_version: int
 
     def to_dict(self) -> dict:
@@ -76,8 +76,8 @@ class TrainingLog:
             lines.append(f"--- Iteration {entry.iteration}{score_change} ---")
             lines.append(f"Batch: {', '.join(entry.batch_ids[:5])}{'...' if len(entry.batch_ids) > 5 else ''}")
             lines.append(f"Learnings: {entry.learnings}")
-            if entry.errors_addressed:
-                lines.append(f"Fixed: {'; '.join(entry.errors_addressed[:5])}")
+            if entry.issues:
+                lines.append(f"Issues: {entry.issues}")
             lines.append("")
 
         return "\n".join(lines)

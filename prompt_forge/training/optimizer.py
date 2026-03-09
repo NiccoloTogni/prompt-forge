@@ -7,11 +7,15 @@ This is the heart of the library. It takes:
     - The training log (what was learned before)
     - Optional: evaluation results from testing the current prompt
 
-And produces an improved version of the prompt.
+And produces in a single LLM call:
+    - An improved version of the prompt
+    - A summary of what was learned
+    - A list of issues/gaps that could not be resolved
 """
 
 import json
 import logging
+import re
 from typing import Callable
 
 from .prompt import DEFAULT_META_PROMPT
@@ -20,9 +24,7 @@ from ..file_loaders import FileLoader, get_default_loader
 from ..bundle import ExampleBundle, is_output_role
 
 # ── Module-level defaults ─────────────────────────────────────────────────────
-MAX_PROMPT_LENGTH = 5000    # Max chars shown in learnings diff (not a token limit)
-OPTIMIZER_TEMPERATURE = 1   # Sampling temperature for the prompt-generation call
-LEARNINGS_TEMPERATURE = 1   # Sampling temperature for the learnings-summary call
+OPTIMIZER_TEMPERATURE = 1   # Sampling temperature for the optimizer call
 TOKEN_CHARS_PER_TOKEN = 4   # Chars-per-token ratio used by the built-in estimator
 
 logger = logging.getLogger(__name__)
@@ -32,7 +34,10 @@ class PromptOptimizer:
     """
     The Prompt Engineering Agent.
 
-    Analyzes examples and produces improved system prompts.
+    Analyzes examples and produces in a single LLM call:
+    - An improved system prompt
+    - A summary of what was learned this iteration
+    - A list of outstanding issues or gaps in the training data
     """
 
     def __init__(
@@ -50,7 +55,7 @@ class PromptOptimizer:
             meta_prompt: Custom meta-prompt for the optimizer. If None, uses default.
             file_loader: FileLoader for reading example files.
             context: Additional context about the task/domain.
-            temperature: Sampling temperature for the prompt-generation LLM call.
+            temperature: Sampling temperature for the optimizer LLM call.
                          See OPTIMIZER_TEMPERATURE for the default value.
             token_estimator: Callable that estimates token count for a string.
                              Defaults to len(text) // TOKEN_CHARS_PER_TOKEN.
@@ -71,10 +76,12 @@ class PromptOptimizer:
         eval_feedback: str = "",
         output_schema: dict | None = None,
         max_tokens: int | None = None,
-        extract_learnings: bool = True,
     ) -> "OptimizerResult":
         """
         Produce an improved prompt based on examples and feedback.
+
+        A single LLM call returns the optimized prompt, a learnings summary,
+        and a list of outstanding issues — all parsed from a structured XML response.
 
         Args:
             current_prompt: The current system prompt to improve.
@@ -86,20 +93,12 @@ class PromptOptimizer:
                         optimizer call. If any single example exceeds the budget
                         on its own, a ValueError is raised. If the full batch
                         exceeds the budget, it is trimmed and a warning is logged.
-            extract_learnings: If True (default), makes a second LLM call to
-                               summarize what changed and stores it in the training
-                               history. If False, a lightweight character-diff note
-                               is stored instead — the training history remains
-                               populated but less descriptive.
 
         Returns:
-            OptimizerResult with the new prompt and learnings summary.
+            OptimizerResult with the new prompt, learnings, and issues.
         """
-        # Resolve schema: use explicit if given, otherwise auto-detect from examples
         resolved_schema = output_schema or self._detect_output_schema(examples)
 
-        # Enforce context-window budget before building the final message
-        # Potentially trims the example batch and logs a warning if it doesn't fit.
         if max_tokens is not None:
             examples = self._fit_examples_to_budget(
                 examples=examples,
@@ -110,7 +109,6 @@ class PromptOptimizer:
                 max_tokens=max_tokens,
             )
 
-        # Build the user message with all context
         user_content = self._build_user_message(
             current_prompt=current_prompt,
             examples=examples,
@@ -126,31 +124,58 @@ class PromptOptimizer:
 
         logger.info(f"Optimizing prompt with {len(examples)} examples...")
         response = self.llm.complete(messages, temperature=self.temperature)
-        new_prompt = response.text.strip()
 
-        # Optionally summarize what was learned (second LLM call — skippable to save tokens)
-        if extract_learnings:
-            learnings, learnings_usage = self._extract_learnings(current_prompt, new_prompt, examples)
-            combined_usage = self._sum_usage(response.usage, learnings_usage)
-        else:
-            # No LLM call — produce a minimal diff-based note so the training history
-            # isn't empty. Empty learnings would cause the optimizer to lose context
-            # about what changed in previous iterations.
-            added = len(new_prompt) - len(current_prompt)
-            learnings = (
-                f"Prompt revised from {len(current_prompt)} to {len(new_prompt)} chars "
-                f"({'+' if added >= 0 else ''}{added}). "
-                f"Trained on {len(examples)} example(s). "
-                "(Learnings extraction skipped.)"
-            )
-            combined_usage = response.usage
+        new_prompt, learnings, issues = self._parse_structured_response(
+            response.text, current_prompt
+        )
 
         return OptimizerResult(
             new_prompt=new_prompt,
             learnings=learnings,
+            issues=issues,
             output_schema=resolved_schema,
-            usage=combined_usage,
+            usage=response.usage,
         )
+
+    # ── Parsing ───────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _parse_structured_response(
+        text: str,
+        fallback_prompt: str,
+    ) -> tuple[str, str, str]:
+        """
+        Extract (optimized_prompt, learnings, issues) from the XML-tagged response.
+
+        Falls back gracefully if the model doesn't follow the format exactly:
+        - If <optimized_prompt> is missing, the full response is used as the prompt.
+        - If <learnings> or <issues> are missing, they default to empty strings.
+        """
+        def extract(tag: str) -> str:
+            match = re.search(
+                rf"<{tag}>(.*?)</{tag}>",
+                text,
+                flags=re.DOTALL,
+            )
+            return match.group(1).strip() if match else ""
+
+        new_prompt = extract("optimized_prompt")
+        if not new_prompt:
+            # Model didn't follow the format — treat the whole response as the prompt
+            logger.warning(
+                "Optimizer response missing <optimized_prompt> tag. "
+                "Using full response as prompt. Consider reviewing your meta_prompt."
+            )
+            new_prompt = text.strip() or fallback_prompt
+
+        learnings = extract("learnings")
+        issues = extract("issues")
+        if issues.lower() == "none":
+            issues = ""
+
+        return new_prompt, learnings, issues
+
+    # ── Token budget ──────────────────────────────────────────────────────────
 
     def _estimate_tokens(self, text: str) -> int:
         """Estimate the token count for a string using the configured estimator."""
@@ -180,17 +205,13 @@ class PromptOptimizer:
         """
         Trim the example batch to fit within the token budget.
 
-        The total token count is estimated as:
-            tokens(meta_prompt) + tokens(user_message_overhead) + tokens(examples)
-
         Raises:
             ValueError: If a single example already exceeds the token budget on its own.
 
         Returns:
             A (possibly shorter) list of examples that fits in the budget.
-            if trimmed, a warning is logged.
+            If trimmed, a warning is logged.
         """
-        # Build the overhead portion of the user message (everything except examples body)
         overhead_parts = []
         if self.context:
             overhead_parts.append(f"<task_context>\n{self.context}\n</task_context>")
@@ -221,7 +242,6 @@ class PromptOptimizer:
                 "Reduce context, training_history, or increase max_tokens."
             )
 
-        # Check each example individually first — fail fast on oversized examples
         for example in examples:
             rendered = self._render_example(example)
             example_tokens = self._estimate_tokens(rendered)
@@ -232,7 +252,6 @@ class PromptOptimizer:
                     "Reduce example size or increase max_tokens."
                 )
 
-        # Greedily fill the batch
         fitted: list[ExampleBundle] = []
         used_tokens = 0
         for example in examples:
@@ -250,6 +269,8 @@ class PromptOptimizer:
             used_tokens += example_tokens
 
         return fitted
+
+    # ── Schema detection ──────────────────────────────────────────────────────
 
     def _detect_output_schema(self, examples: list[ExampleBundle]) -> dict | None:
         """
@@ -276,12 +297,11 @@ class PromptOptimizer:
                             json_examples.append(parsed)
                     except (json.JSONDecodeError, ValueError):
                         pass
-                    break  # only check the first matching role per example
+                    break
 
         if total == 0 or len(json_examples) / total < 0.5:
             return None
 
-        # Infer lightweight schema from union of top-level keys
         all_keys: dict[str, str] = {}
         for example in json_examples:
             for key, value in example.items():
@@ -299,6 +319,8 @@ class PromptOptimizer:
 
         return {"type": "object", "properties": all_keys}
 
+    # ── Message building ──────────────────────────────────────────────────────
+
     def _build_user_message(
         self,
         current_prompt: str,
@@ -310,22 +332,17 @@ class PromptOptimizer:
         """Assemble the full context for the optimizer."""
         sections = []
 
-        # Task context
         if self.context:
             sections.append(f"<task_context>\n{self.context}\n</task_context>")
 
-        # Current prompt
         sections.append(f"<current_prompt>\n{current_prompt}\n</current_prompt>")
 
-        # Training history
         if training_history:
             sections.append(f"<training_history>\n{training_history}\n</training_history>")
 
-        # Evaluation feedback
         if eval_feedback:
             sections.append(f"<evaluation_feedback>\n{eval_feedback}\n</evaluation_feedback>")
 
-        # Structured output requirement
         if output_schema:
             sections.append(
                 "<structured_output_requirement>\n"
@@ -340,7 +357,6 @@ class PromptOptimizer:
                 "</structured_output_requirement>"
             )
 
-        # Examples
         sections.append("<examples>")
         for i, example in enumerate(examples, 1):
             sections.append(f"\n--- Example {i} (ID: {example.bundle_id}) ---")
@@ -355,47 +371,6 @@ class PromptOptimizer:
 
         return "\n\n".join(sections)
 
-    def _extract_learnings(
-        self,
-        old_prompt: str,
-        new_prompt: str,
-        examples: list[ExampleBundle],
-    ) -> tuple[str, dict[str, int] | None]:
-        """Ask the LLM to summarize what was learned in this iteration.
-
-        Returns:
-            (learnings_text, usage_dict)
-        """
-        messages = [
-            LLMMessage(role="system", content=(
-                "You are summarizing what was learned from a prompt optimization iteration. "
-                "Be concise but specific. Focus on new rules, patterns, and edge cases discovered."
-            )),
-            LLMMessage(role="user", content=(
-                f"The prompt was updated after analyzing {len(examples)} examples.\n\n"
-                f"<old_prompt>\n{old_prompt[:MAX_PROMPT_LENGTH]}{'...' if len(old_prompt) > MAX_PROMPT_LENGTH else ''}\n</old_prompt>\n\n"
-                f"<new_prompt>\n{new_prompt[:MAX_PROMPT_LENGTH]}{'...' if len(new_prompt) > MAX_PROMPT_LENGTH else ''}\n</new_prompt>\n\n"
-                "Summarize the key changes and new learnings in 2-5 bullet points. "
-                "Focus on WHAT was learned, not how the prompt changed syntactically."
-            )),
-        ]
-
-        response = self.llm.complete(messages, temperature=LEARNINGS_TEMPERATURE)
-        return response.text.strip(), response.usage
-
-    @staticmethod
-    def _sum_usage(
-        a: dict[str, int] | None,
-        b: dict[str, int] | None,
-    ) -> dict[str, int] | None:
-        """Sum two usage dicts, returning None only if both are None."""
-        if a is None and b is None:
-            return None
-        result: dict[str, int] = {}
-        for key in ("input_tokens", "output_tokens"):
-            result[key] = (a or {}).get(key, 0) + (b or {}).get(key, 0)
-        return result
-
 
 class OptimizerResult:
     """Result from a single optimization step."""
@@ -404,10 +379,12 @@ class OptimizerResult:
         self,
         new_prompt: str,
         learnings: str,
+        issues: str = "",
         output_schema: dict | None = None,
         usage: dict[str, int] | None = None,
     ):
         self.new_prompt = new_prompt
         self.learnings = learnings
+        self.issues = issues
         self.output_schema = output_schema
         self.usage = usage

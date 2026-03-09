@@ -1,6 +1,8 @@
 """Build an LLM client from app config."""
 
 import streamlit as st
+from openai import AzureOpenAI
+from prompt_forge import LLMResponse
 
 from prompt_forge.app.state import load_app_config
 
@@ -15,9 +17,6 @@ def build_llm():
         return None
 
     try:
-        from openai import AzureOpenAI
-        from prompt_forge import LLMMessage, LLMResponse
-
         class _AzureClient:
             def __init__(self):
                 self._client = AzureOpenAI(

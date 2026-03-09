@@ -51,9 +51,6 @@ class TrainingConfig:
     refinement_threshold: float = DEFAULT_REFINEMENT_THRESHOLD
     max_tokens: int | None = None         # Per-call context window limit for optimizer
     max_total_tokens: int | None = None   # Total token budget for the whole run
-    extract_learnings: bool = True        # Set False to skip the learnings-summary LLM call;
-                                          # a lightweight diff note is stored instead so
-                                          # training history remains populated
     optimizer_temperature: float = OPTIMIZER_TEMPERATURE  # Temperature for optimizer calls
     inference_temperature: float = DEFAULT_INFERENCE_TEMPERATURE  # Temperature for eval inference
 
@@ -67,6 +64,7 @@ class IterationResult:
     score_after: float | None
     improved: bool
     learnings: str
+    issues: str       # Outstanding gaps/contradictions flagged by the optimizer
     batch_ids: list[str]
     tokens_used: int | None = None  # Total tokens consumed in this iteration (optimizer + eval)
 
@@ -84,6 +82,15 @@ class TrainingReport:
     final_score: float | None
     refinement_recommended: bool  # True if score is below refinement_threshold or unknown
     total_tokens_used: int = 0   # Cumulative input + output tokens across the entire run
+
+    @property
+    def all_issues(self) -> list[tuple[int, str]]:
+        """All non-empty issues flagged by the optimizer, as (iteration, issues) pairs."""
+        return [
+            (r.iteration, r.issues)
+            for r in self.iterations
+            if r.issues
+        ]
 
     def __iter__(self):
         return iter(self.iterations)
@@ -228,7 +235,6 @@ class TrainingPipeline:
                 eval_feedback=eval_feedback,
                 output_schema=config.output_schema,
                 max_tokens=config.max_tokens,
-                extract_learnings=config.extract_learnings,
             )
             # Accumulate optimizer tokens (inference tokens are added inside _default_inference)
             self._total_tokens += self._count_tokens(opt_result.usage)
@@ -283,7 +289,7 @@ class TrainingPipeline:
                 score_before=score_before,
                 score_after=score_after,
                 learnings=opt_result.learnings,
-                errors_addressed=[],  # TODO: extract from eval feedback
+                issues=opt_result.issues,
                 prompt_version=current_version,
             )
             self.training_log.add_entry(log_entry)
@@ -301,6 +307,7 @@ class TrainingPipeline:
                 score_after=score_after,
                 improved=improved,
                 learnings=opt_result.learnings,
+                issues=opt_result.issues,
                 batch_ids=batch_ids,
                 tokens_used=iteration_tokens,
             )
