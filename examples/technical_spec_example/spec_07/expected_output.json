@@ -1,0 +1,82 @@
+{
+  "product_name": "MediCore MCX-200 Portable Ultrasound",
+  "manufacturer": "BioScan Medical Devices",
+  "model": "MCX-200-CV",
+  "fda_510k": "K241567",
+  "date": "2024-04-11",
+  "category": "Portable Ultrasound System",
+  "application": "Cardiac and Vascular Imaging",
+  "transducer_type": "Phased Array",
+  "transducer_bandwidth_mhz": [
+    1,
+    5
+  ],
+  "transducer_elements": 64,
+  "imaging_modes": [
+    "B-mode",
+    "M-mode",
+    "CFM",
+    "PW Doppler",
+    "CW Doppler",
+    "THI"
+  ],
+  "frame_rate_fps": 60,
+  "dynamic_range_db": 160,
+  "display_size_inch": 10.1,
+  "display_resolution": "1920x1200",
+  "display_brightness_nits": 500,
+  "depth_min_cm": 2,
+  "depth_max_cm": 30,
+  "beamforming_channels": 256,
+  "beamforming_algorithm": "DAS",
+  "processing": [
+    "FPGA",
+    "ARM SoC",
+    "NPU"
+  ],
+  "ai_features": [
+    "EF estimation",
+    "VTI measurement",
+    "DVT detection"
+  ],
+  "connectivity": [
+    "Wi-Fi 6",
+    "BLE 5.2",
+    "USB-C"
+  ],
+  "dicom_version": "3.0",
+  "storage_gb": 256,
+  "storage_type": "NVMe SSD",
+  "battery_mah": 10000,
+  "battery_type": "LiPo",
+  "battery_life_hours": 4,
+  "weight_kg": 1.2,
+  "classification_fda": "Class II",
+  "classification_ce": "Class IIa",
+  "acronyms_used": [
+    "POCT",
+    "CADx",
+    "CW",
+    "PW",
+    "PA",
+    "CFM",
+    "THI",
+    "FPS",
+    "BF",
+    "DAS",
+    "FPGA",
+    "SoC",
+    "NPU",
+    "EF",
+    "VTI",
+    "DVT",
+    "BLE",
+    "DICOM",
+    "SCU",
+    "SCP",
+    "NVMe",
+    "SSD",
+    "LiPo",
+    "MDR"
+  ]
+}

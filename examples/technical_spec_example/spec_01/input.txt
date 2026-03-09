@@ -1,0 +1,21 @@
+TECHNICAL SPECIFICATION SHEET — MODEL XR-7200 LIDAR MODULE
+
+Manufacturer: Optronix Systems Inc.
+Part Number: OPT-XR7200-REV3
+Date: 2024-08-15
+
+The XR-7200 is a high-resolution LIDAR (Light Detection And Ranging) module designed for ADAS (Advanced Driver Assistance Systems) integration in EV (Electric Vehicle) platforms. It operates using a VCSEL (Vertical-Cavity Surface-Emitting Laser) array at 905nm wavelength.
+
+Key Parameters:
+- FOV (Field of View): 120° horizontal, 25° vertical
+- Range: 200m @ 10% NIST reflectivity
+- Angular Resolution: 0.1° (H) x 0.2° (V)
+- Frame Rate: 20 FPS (Frames Per Second)
+- Interface: GbE (Gigabit Ethernet) with PTP (Precision Time Protocol) sync
+- Power Consumption: 18W TDP (Thermal Design Power)
+- MTBF (Mean Time Between Failures): 50,000 hours
+- Operating Temperature: -40°C to +85°C
+- IP Rating: IP67 (Ingress Protection)
+- EMC Compliance: CISPR 25 Class 5, ISO 11452-2
+
+The module supports ROS2 (Robot Operating System 2) natively and outputs PCL (Point Cloud Library) compatible data streams via UDP (User Datagram Protocol). Firmware updates are delivered OTA (Over-The-Air) through the vehicle's TCU (Telematics Control Unit).

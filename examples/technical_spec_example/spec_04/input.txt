@@ -1,0 +1,24 @@
+ENGINEERING SPECIFICATION — AEROCORE ACM-550 FLIGHT CONTROLLER
+
+Developer: SkyDynamics Aerospace
+Part ID: SDA-ACM550-MIL
+Spec Revision: D4
+Effective: 2024-01-18
+
+The ACM-550 is a ruggedized FCU (Flight Control Unit) for UAV (Unmanned Aerial Vehicle) platforms operating in BVLOS (Beyond Visual Line of Sight) missions. It integrates triple-redundant IMU (Inertial Measurement Unit) and dual GNSS (Global Navigation Satellite System) receivers.
+
+Performance Specifications:
+- IMU: 3x MEMS (Micro-Electro-Mechanical Systems) 9-DOF (Degrees of Freedom) sensors
+- GNSS: Dual-band L1/L5, RTK (Real-Time Kinematic) capable, CEP (Circular Error Probable) < 2cm
+- AHRS (Attitude and Heading Reference System): Fusion rate 400 Hz
+- Autopilot Modes: RTL (Return to Launch), WPT (Waypoint) nav, ORBIT, VTOL (Vertical Take-Off and Landing) transition
+- Interfaces: 4x UART, 2x SPI, 2x I2C, 1x CAN FD (Flexible Data-rate)
+- PWM Outputs: 14 channels for ESC (Electronic Speed Controller) and servo control
+- Telemetry: MAVLink v2 over 900 MHz ISM (Industrial, Scientific, Medical) band
+- Processor: STM32H7 dual-core @ 480 MHz with FPU (Floating-Point Unit)
+- Memory: 2MB flash, 1MB SRAM
+- Supply Voltage: 4.5V–6.0V regulated via onboard BEC (Battery Eliminator Circuit)
+- Vibration: MIL-STD-810G Method 514.7
+- Operating Temp: -20°C to +70°C
+- Weight: 48g (without enclosure)
+- Compliance: DO-160G (environmental), STANAG 4586 (interoperability)

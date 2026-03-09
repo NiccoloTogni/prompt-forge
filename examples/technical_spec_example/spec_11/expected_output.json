@@ -1,0 +1,103 @@
+{
+  "product_name": "RoboVault RV-8800 NAS Storage Appliance",
+  "vendor": "DataFort Systems",
+  "model": "RV-8800-R2",
+  "sku": "DFS-RV8800-64T",
+  "date": "2024-08-30",
+  "category": "Enterprise NAS",
+  "target_market": [
+    "SMB",
+    "ROBO"
+  ],
+  "filesystem": "ZFS",
+  "drive_bays": 8,
+  "drive_form_factor": "3.5\"",
+  "drive_interfaces": [
+    "SATA III",
+    "SAS 12 Gbps"
+  ],
+  "max_raw_capacity_tb": 192,
+  "raid_levels": [
+    "RAID 0",
+    "RAID 1",
+    "RAID 5",
+    "RAID 6",
+    "RAID 10",
+    "RAIDZ1",
+    "RAIDZ2",
+    "RAIDZ3"
+  ],
+  "read_cache": "L2ARC via M.2 NVMe",
+  "write_cache": "ZIL via M.2 NVMe",
+  "dedup_algorithm": "SHA-256",
+  "compression_options": [
+    "LZ4",
+    "ZSTD"
+  ],
+  "snapshots": "Unlimited COW",
+  "nics_10gbe": 2,
+  "nic_10gbe_type": "SFP+",
+  "nics_1gbe": 1,
+  "ipmi": true,
+  "file_protocols": [
+    "SMB 3.1.1",
+    "NFS v4.2",
+    "AFP",
+    "iSCSI"
+  ],
+  "authentication": [
+    "Active Directory",
+    "LDAP",
+    "NIS"
+  ],
+  "backup_protocols": [
+    "NDMP",
+    "rsync",
+    "S3-compatible"
+  ],
+  "cpu": "Intel Xeon D-2776NT",
+  "cpu_cores": 16,
+  "cpu_threads": 32,
+  "cpu_clock_ghz": 2.1,
+  "ram_gb": 64,
+  "ram_type": "DDR5 ECC RDIMM",
+  "os": "DataFort DSM v8.2",
+  "os_base": "FreeBSD",
+  "psu_watts": 550,
+  "psu_redundancy": "Dual",
+  "psu_efficiency": "80 PLUS Gold",
+  "form_factor": "2U rackmount",
+  "noise_dba": 45,
+  "warranty": "5 years NBD on-site",
+  "acronyms_used": [
+    "NAS",
+    "SMB",
+    "ROBO",
+    "SATA",
+    "SAS",
+    "SCSI",
+    "RAID",
+    "NVMe",
+    "SSD",
+    "L2ARC",
+    "SLOG",
+    "ZIL",
+    "SHA",
+    "COW",
+    "GbE",
+    "SFP+",
+    "IPMI",
+    "NFS",
+    "AFP",
+    "iSCSI",
+    "AD",
+    "LDAP",
+    "NIS",
+    "NDMP",
+    "ECC",
+    "RDIMM",
+    "DDR5",
+    "PSU",
+    "NBD"
+  ]
+}

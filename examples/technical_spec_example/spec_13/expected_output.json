@@ -1,0 +1,71 @@
+{
+  "product_name": "ForgeMaster FM-X90 CNC Milling Center",
+  "manufacturer": "PrecisionTech Machinery",
+  "model": "FM-X90-5AX",
+  "serial_prefix": "PTM-X90",
+  "date": "2024-04-30",
+  "category": "5-axis Vertical Machining Center",
+  "capability": "HSM for aerospace alloys",
+  "target_materials": [
+    "Ti-6Al-4V",
+    "Inconel"
+  ],
+  "axes_count": 5,
+  "travel_x_mm": 1200,
+  "travel_y_mm": 800,
+  "travel_z_mm": 600,
+  "travel_a_deg": 240,
+  "travel_c_deg": 360,
+  "spindle_rpm": 20000,
+  "spindle_power_kw": 40,
+  "spindle_interface": "HSK-A63",
+  "torque_nm": 120,
+  "torque_at_rpm": 3200,
+  "rapid_feed_m_min": 60,
+  "cutting_feed_m_min": 30,
+  "acceleration_g": 1.2,
+  "atc_capacity": 60,
+  "atc_tool_to_tool_sec": 1.5,
+  "atc_chip_to_chip_sec": 3.2,
+  "positioning_accuracy_um": 3,
+  "repeatability_um": 1.5,
+  "table_load_kg": 500,
+  "coolant_pressure_bar": 70,
+  "coolant_type": "TSC",
+  "mql_option": true,
+  "cnc_controller": "Siemens SINUMERIK 840D sl",
+  "probing": [
+    "Renishaw OMP60",
+    "Renishaw RMP60"
+  ],
+  "electrical_voltage_v": 400,
+  "electrical_current_a": 63,
+  "electrical_load_kva": 45,
+  "machine_weight_kg": 12500,
+  "footprint_mm": [
+    3200,
+    2800
+  ],
+  "compliance": [
+    "ISO 230-1",
+    "ISO 230-2",
+    "ISO 10791-7",
+    "OSHA",
+    "CE"
+  ],
+  "acronyms_used": [
+    "VMC",
+    "HSM",
+    "DDM",
+    "HSK",
+    "RPM",
+    "ATC",
+    "TSC",
+    "MQL",
+    "CNC",
+    "OMP",
+    "RMP",
+    "CE",
+    "OSHA"
+  ]
+}

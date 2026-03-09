@@ -1,0 +1,24 @@
+DATASHEET — PIXELFORGE PFX-880 GPU ACCELERATOR CARD
+
+Manufacturer: SiliconPeak Semiconductors
+Product Code: SPX-PFX880-16G
+Revision: A1
+Publication Date: 2024-09-05
+
+The PFX-880 is a PCIe (Peripheral Component Interconnect Express) Gen 5 GPU (Graphics Processing Unit) accelerator designed for ML (Machine Learning) inference and HPC (High-Performance Computing) workloads. It utilizes a custom ISA (Instruction Set Architecture) optimized for INT8 and FP16 (16-bit Floating Point) tensor operations.
+
+Core Specifications:
+- Compute Units: 128 CUs (Compute Units), each with 64 ALUs (Arithmetic Logic Units)
+- Clock: 1.8 GHz base / 2.4 GHz boost
+- INT8 TOPs: 480 TOPS (Tera Operations Per Second)
+- FP16 TFLOPs: 120 TFLOPS (Tera Floating Point Operations Per Second)
+- Memory: 16GB HBM3 (High Bandwidth Memory 3), 1.2 TB/s bandwidth
+- PCIe: Gen 5 x16, 64 GT/s (Giga Transfers per second)
+- TDP: 300W, dual 8-pin EPS (Electrical Power Standard) connectors
+- Cooling: Active heatsink with vapor chamber, 2x 80mm axial fans
+- NVLink: Not supported; uses proprietary SPX-Link @ 400 GB/s bidirectional
+- Software: SPDK (SiliconPeak Development Kit) with CUDA (Compute Unified Device Architecture) translation layer
+- API Support: Vulkan 1.3, OpenCL 3.0, ONNX (Open Neural Network Exchange) Runtime
+- Form Factor: Dual-slot, full-height, full-length (FHFL)
+- RoHS (Restriction of Hazardous Substances): Compliant
+- ECC (Error Correction Code): Supported on HBM3, SECDED (Single Error Correction, Double Error Detection)

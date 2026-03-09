@@ -49,7 +49,7 @@ class InferenceAgent:
         self.prompt_text = prompt_text
         self.file_loader = file_loader or get_default_loader()
         self.system_suffix = system_suffix
-        self.llm_kwargs = llm_kwargs or {"temperature": 1}
+        self.llm_kwargs = llm_kwargs or {}
         self.output_schema = output_schema
 
     @classmethod
@@ -176,7 +176,7 @@ class InferenceAgent:
     def run_batch(
         self,
         inputs: list[dict],
-    ) -> list[str]:
+    ) -> list[str | dict]:
         """
         Run inference on multiple inputs.
 
@@ -185,7 +185,7 @@ class InferenceAgent:
                     (e.g., {"input_file": "path/to/file.pdf"}).
 
         Returns:
-            List of output strings.
+            List of outputs — strings, or dicts when output_schema is set.
         """
         results = []
         for i, input_kwargs in enumerate(inputs):

@@ -77,12 +77,15 @@ def _start_training(project, batch_size, max_iter, patience, eval_strategy, max_
 
     def run():
         try:
+            from prompt_forge.training.pipeline import TrainingConfig
             report = project.train(
-                batch_size=batch_size,
-                max_iterations=max_iter,
-                patience=patience,
+                config=TrainingConfig(
+                    batch_size=batch_size,
+                    max_iterations=max_iter,
+                    patience=patience,
+                    max_total_tokens=max_total,
+                ),
                 eval_strategy=eval_strategy if eval_strategy != "none" else None,
-                max_total_tokens=max_total,
                 on_iteration=on_iteration,
             )
             st.session_state.training_report = report

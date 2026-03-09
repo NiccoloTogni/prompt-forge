@@ -1,0 +1,25 @@
+SPECIFICATION OVERVIEW — MEDICORE MCX-200 PORTABLE ULTRASOUND
+
+Manufacturer: BioScan Medical Devices
+Model: MCX-200-CV
+Regulatory Reference: FDA 510(k) K241567
+Date: 2024-04-11
+
+The MCX-200 is a POCT (Point-of-Care Testing) portable ultrasound system with integrated AI-based CADx (Computer-Aided Diagnosis) for cardiac and vascular imaging. It features a phased-array transducer with CW (Continuous Wave) and PW (Pulsed Wave) Doppler modes.
+
+Technical Specifications:
+- Transducer: PA (Phased Array), 1–5 MHz bandwidth, 64 elements
+- Imaging Modes: B-mode, M-mode, CFM (Color Flow Mapping), PW Doppler, CW Doppler, THI (Tissue Harmonic Imaging)
+- Frame Rate: Up to 60 FPS in B-mode
+- Dynamic Range: 160 dB
+- Display: 10.1" IPS LCD, 1920x1200, 500 nits
+- Depth: Adjustable 2–30 cm
+- Beamforming: 256-channel digital BF (Beamformer) with DAS (Delay and Sum) algorithm
+- Processing: FPGA (Field-Programmable Gate Array) + ARM SoC (System on Chip) with NPU (Neural Processing Unit)
+- AI Features: Automated EF (Ejection Fraction) estimation, VTI (Velocity Time Integral) measurement, DVT (Deep Vein Thrombosis) detection
+- Connectivity: Wi-Fi 6 (802.11ax), BLE (Bluetooth Low Energy) 5.2, USB-C
+- DICOM (Digital Imaging and Communications in Medicine): DICOM 3.0, SCU/SCP
+- Data Storage: 256GB NVMe SSD
+- Battery: 10,000 mAh LiPo (Lithium Polymer), 4 hours continuous use
+- Weight: 1.2 kg with transducer
+- Classification: Class II medical device per FDA, CE MDR (Medical Device Regulation) Class IIa

@@ -26,7 +26,7 @@ from typing import Any, Callable
 
 from ..llm.client import LLMClient, LLMMessage
 from ..file_loaders import FileLoader, get_default_loader
-from ..bundle import BundleCollection, ExampleBundle
+from ..bundle import BundleCollection, ExampleBundle, is_output_role
 from ..storage.project_store import ProjectStore, PromptVersion
 
 logger = logging.getLogger(__name__)
@@ -256,7 +256,7 @@ class InteractiveOptimizer:
             return ""
 
         for role, content in contents.items():
-            if not ("expected" in role.lower() or "output" in role.lower()):
+            if not is_output_role(role):
                 truncated = content.text[:800] + ("..." if len(content.text) > 800 else "")
                 say(f"\n<{role}>\n{truncated}\n</{role}>")
 
@@ -284,7 +284,7 @@ class InteractiveOptimizer:
         contents = bundle.load_contents(self.file_loader)
         input_parts = []
         for role, content in contents.items():
-            if not ("expected" in role.lower() or "output" in role.lower()):
+            if not is_output_role(role):
                 input_parts.append(f"<{role}>\n{content.text}\n</{role}>")
 
         messages = [

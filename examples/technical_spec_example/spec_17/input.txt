@@ -1,0 +1,37 @@
+TECHNICAL DATASHEET — STRATOSYNC SS-7500 5G BASE STATION
+
+Manufacturer: TeleCore Networks
+Model: SS-7500-MIMO
+Product Code: TCN-SS7500-FR2
+Date: 2024-09-20
+
+The SS-7500 is a 5G NR (New Radio) gNB (Next Generation Node B) base station supporting FR2 (Frequency Range 2) mmWave (millimeter wave) bands. It features mMIMO (Massive Multiple-Input Multiple-Output) antenna architecture with hybrid beamforming.
+
+Radio Specifications:
+- Frequency: n257 (26.5–29.5 GHz), n258 (24.25–27.5 GHz), n261 (27.5–28.35 GHz)
+- Bandwidth: Up to 400 MHz (8x CC, Component Carriers, with CA, Carrier Aggregation)
+- MIMO Configuration: 256T256R (256 Transmit, 256 Receive) active antenna elements
+- Beamforming: Hybrid analog/digital, 64 digital streams
+- EIRP (Effective Isotropic Radiated Power): 65 dBm
+- DL (Downlink) Peak: 20 Gbps per sector (256-QAM, 8 layers)
+- UL (Uplink) Peak: 5 Gbps per sector (64-QAM, 4 layers)
+- Subcarrier Spacing: 120 kHz (SCS)
+- Latency: < 1 ms user-plane (URLLC, Ultra-Reliable Low-Latency Communications)
+- Connected Devices: 1M per km² (mMTC, massive Machine-Type Communications)
+
+Baseband & Transport:
+- BBU (Baseband Unit): Separate, connected via eCPRI (enhanced Common Public Radio Interface) over 25GbE fiber
+- RRU (Remote Radio Unit): Integrated in antenna panel
+- Fronthaul: Option 7-2x split per O-RAN (Open Radio Access Network) Alliance
+- Core Interface: N2/N3 towards 5GC (5G Core) via SBA (Service-Based Architecture)
+- Synchronization: GPS + PTP (IEEE 1588v2) for TDD (Time Division Duplex) frame alignment
+
+Installation:
+- Mounting: Pole or wall, integrated bracket, 15° electrical downtilt
+- Dimensions: 600mm x 600mm x 120mm (antenna panel)
+- Weight: 35 kg per panel
+- Wind Load: Rated for 200 km/h
+- Power: -48 VDC from PSU shelf, 1200W max per panel
+- Cooling: Passive, no fans
+- IP Rating: IP66
+- Certifications: 3GPP Rel. 17, FCC Part 30, ETSI EN 302 217, RoHS

@@ -1,0 +1,23 @@
+SPEC DOCUMENT — QUANTUMLINK QLC-9000 NETWORK SWITCH
+
+Manufacturer: NebulaNet Corporation
+SKU: NN-QLC9000-48T
+Engineering Release: v2.1
+Date Issued: 2024-06-10
+
+The QLC-9000 is a managed L3 (Layer 3) network switch designed for DC (Data Center) and HPC (High-Performance Computing) environments. It features a non-blocking switching fabric with cut-through forwarding.
+
+Technical Details:
+- Port Configuration: 48x 25GbE SFP28 + 8x 100GbE QSFP28
+- Switching Capacity: 6.4 Tbps (Terabits per second)
+- Forwarding Rate: 4.76 Bpps (Billion packets per second)
+- Latency: < 900ns (nanoseconds) port-to-port
+- Buffer: 64MB shared on-chip with VOQ (Virtual Output Queuing)
+- Routing Protocols: BGP (Border Gateway Protocol), OSPF (Open Shortest Path First), VXLAN (Virtual Extensible LAN), EVPN (Ethernet VPN)
+- QoS: 8 queues per port, WRED (Weighted Random Early Detection), ECN (Explicit Congestion Notification)
+- Management: SNMP v3, SSH, REST API, gNMI (gRPC Network Management Interface)
+- NOS: NebulaOS based on ONIE (Open Network Install Environment)
+- Redundancy: Dual PSU (Power Supply Unit), hot-swappable FAN trays
+- Power: 450W max, 80 PLUS Platinum PSU
+- Rack: 1RU (Rack Unit) form factor
+- MTBF: 300,000 hours

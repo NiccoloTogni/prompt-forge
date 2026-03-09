@@ -1,0 +1,91 @@
+{
+  "product_name": "IonBeam IBX-350 Mass Spectrometer",
+  "manufacturer": "AnalytiChem Instruments",
+  "model": "IBX-350-QQQ",
+  "part_number": "ACI-IBX350-V2",
+  "date": "2024-07-08",
+  "category": "Triple Quadrupole Mass Spectrometer",
+  "ionization_sources": [
+    "ESI",
+    "APCI"
+  ],
+  "technique": "LC-MS/MS",
+  "applications": [
+    "Clinical",
+    "Forensic",
+    "Environmental"
+  ],
+  "mass_range_mz": [
+    5,
+    3000
+  ],
+  "resolution": "Unit mass (FWHM)",
+  "scan_speed_da_s": 15000,
+  "mrm_transitions": 512,
+  "polarity_switching_ms": 15,
+  "sensitivity_fg": 500,
+  "sensitivity_compound": "Reserpine",
+  "sensitivity_sn_ratio": "100:1",
+  "dynamic_range_orders": 6,
+  "mass_accuracy_da": 0.1,
+  "cid_energy_ev": [
+    0,
+    180
+  ],
+  "collision_gas": "N2",
+  "esi_voltage_kv": 5.5,
+  "apci_corona_current_ua": [
+    0,
+    10
+  ],
+  "source_temp_esi_max_c": 650,
+  "source_temp_apci_max_c": 500,
+  "nebulizer_gas_psi": [
+    0,
+    80
+  ],
+  "desolvation_gas_l_hr": [
+    200,
+    1200
+  ],
+  "vacuum_pump": "TMP",
+  "vacuum_pump_speed_l_s": 300,
+  "detector_type": "Electron Multiplier",
+  "data_system": "ChromaLab DAS v5.1",
+  "cfr_compliant": true,
+  "interfaces": [
+    "USB 3.0",
+    "LAN",
+    "RS-232"
+  ],
+  "lc_compatibility": "UHPLC up to 1500 bar",
+  "power_vac": "200-240",
+  "power_kva": 2.5,
+  "dimensions_mm": {
+    "W": 710,
+    "D": 620,
+    "H": 580
+  },
+  "weight_kg": 145,
+  "regulatory": [
+    "CE-IVD",
+    "FDA 21 CFR Part 11",
+    "ISO 13485"
+  ],
+  "acronyms_used": [
+    "QQQ",
+    "ESI",
+    "APCI",
+    "LC-MS/MS",
+    "MRM",
+    "FWHM",
+    "Da",
+    "CID",
+    "TMP",
+    "EM",
+    "DAS",
+    "CFR",
+    "UHPLC",
+    "IVD"
+  ]
+}

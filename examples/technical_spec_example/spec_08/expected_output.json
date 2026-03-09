@@ -1,0 +1,123 @@
+{
+  "product_name": "AquaShield AWS-300 Water Quality Analyzer",
+  "manufacturer": "EnviroSense Analytics",
+  "part_number": "ESA-AWS300-PRO",
+  "document_revision": "3.1",
+  "date": "2024-07-20",
+  "category": "Water Quality Analyzer",
+  "application": [
+    "WTP",
+    "WWTP"
+  ],
+  "scada_integration": true,
+  "parameters_measured": {
+    "pH": {
+      "range": "0-14",
+      "resolution": 0.01,
+      "accuracy": 0.02,
+      "sensor": "ISE"
+    },
+    "ORP": {
+      "range_mv": [
+        -2000,
+        2000
+      ]
+    },
+    "DO": {
+      "range_mg_l": [
+        0,
+        20
+      ],
+      "technology": "LDO"
+    },
+    "Turbidity": {
+      "range_ntu": [
+        0,
+        4000
+      ],
+      "method": "EPA 180.1"
+    },
+    "Conductivity": {
+      "range_ms_cm": [
+        0,
+        200
+      ]
+    },
+    "Free_Chlorine": {
+      "range_mg_l": [
+        0,
+        20
+      ],
+      "method": "DPD colorimetric"
+    },
+    "TOC": {
+      "range_mg_l": [
+        0,
+        25
+      ],
+      "method": "UV254"
+    },
+    "TSS": {
+      "range_g_l": [
+        0,
+        50
+      ],
+      "method": "NIR scatter"
+    }
+  },
+  "communication_protocols": [
+    "Modbus TCP/IP",
+    "HART",
+    "4-20mA"
+  ],
+  "io_digital_inputs": 8,
+  "io_digital_outputs": 4,
+  "io_analog_inputs": 4,
+  "hmi_screen_size_inch": 7,
+  "data_logging_capacity": "1M records",
+  "data_export": [
+    "CSV",
+    "USB",
+    "FTP"
+  ],
+  "power_vac_range": "100-240",
+  "power_frequency_hz": "50/60",
+  "power_max_w": 85,
+  "enclosure_rating": [
+    "NEMA 4X",
+    "IP66"
+  ],
+  "housing_material": "316L Stainless Steel",
+  "certifications": [
+    "NSF/ANSI 61",
+    "MCERTS"
+  ],
+  "acronyms_used": [
+    "WQA",
+    "WTP",
+    "WWTP",
+    "SCADA",
+    "EPA",
+    "ISE",
+    "ORP",
+    "DO",
+    "LDO",
+    "NTU",
+    "TDS",
+    "DPD",
+    "TOC",
+    "UV254",
+    "TSS",
+    "NIR",
+    "HART",
+    "DI",
+    "DO",
+    "AI",
+    "HMI",
+    "TFT",
+    "FTP",
+    "NEMA",
+    "SS",
+    "MCERTS"
+  ]
+}

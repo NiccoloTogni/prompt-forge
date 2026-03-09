@@ -1,0 +1,97 @@
+{
+  "product_name": "Sentinex SNX-4000 Cybersecurity Appliance",
+  "vendor": "CyberArc Defense",
+  "model": "SNX-4000-NGFW",
+  "part_number": "CAD-SNX4000-1U",
+  "date": "2024-06-25",
+  "category": "Next-Generation Firewall",
+  "features": [
+    "IPS",
+    "WAF",
+    "ZTNA"
+  ],
+  "deployment": "Perimeter and DMZ",
+  "firewall_throughput_gbps": 40,
+  "ips_throughput_gbps": 12,
+  "ssl_inspection_gbps": 8,
+  "tls_version": "1.3",
+  "concurrent_sessions_million": 10,
+  "new_sessions_per_sec_k": 400,
+  "vpn_ipsec_gbps": 20,
+  "vpn_ssl_gbps": 5,
+  "ztna_max_users": 10000,
+  "ips_signatures": 25000,
+  "signature_update_frequency": "Hourly",
+  "sandboxing": "Cloud-based APT analysis",
+  "url_filtering_categories": 120,
+  "dlp_methods": [
+    "Keyword",
+    "Regex",
+    "ML-based PII detection"
+  ],
+  "siem_formats": [
+    "CEF",
+    "LEEF"
+  ],
+  "management_gui": "HTTPS dashboard with RBAC",
+  "management_cli": [
+    "SSH",
+    "RS-232"
+  ],
+  "management_api": [
+    "REST JSON",
+    "GraphQL"
+  ],
+  "orchestration": [
+    "Ansible",
+    "Terraform",
+    "SOAR"
+  ],
+  "ha_modes": [
+    "Active/Passive",
+    "Active/Active"
+  ],
+  "interfaces_10gbe": 8,
+  "interfaces_40gbe": 2,
+  "interfaces_1gbe_mgmt": 2,
+  "form_factor": "1U rackmount",
+  "psu_watts": 650,
+  "psu_redundancy": "Dual",
+  "certifications": [
+    "CC EAL4+",
+    "FIPS 140-2 Level 2",
+    "ICSA Labs"
+  ],
+  "acronyms_used": [
+    "NGFW",
+    "IPS",
+    "WAF",
+    "ZTNA",
+    "DMZ",
+    "SSL",
+    "TLS",
+    "RSA",
+    "ECDHE",
+    "CPS",
+    "VPN",
+    "IPsec",
+    "TIF",
+    "APT",
+    "YARA",
+    "ETP",
+    "DLP",
+    "PII",
+    "SIEM",
+    "CEF",
+    "LEEF",
+    "RBAC",
+    "SOAR",
+    "HA",
+    "SFP+",
+    "QSFP+",
+    "PSU",
+    "CC",
+    "FIPS",
+    "ICSA"
+  ]
+}

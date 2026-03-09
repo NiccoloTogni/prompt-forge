@@ -1,0 +1,109 @@
+{
+  "product_name": "StratoSync SS-7500 5G Base Station",
+  "manufacturer": "TeleCore Networks",
+  "model": "SS-7500-MIMO",
+  "product_code": "TCN-SS7500-FR2",
+  "date": "2024-09-20",
+  "category": "5G NR mmWave Base Station",
+  "node_type": "gNB",
+  "frequency_range": "FR2",
+  "bands": [
+    "n257",
+    "n258",
+    "n261"
+  ],
+  "frequency_ghz": [
+    [
+      26.5,
+      29.5
+    ],
+    [
+      24.25,
+      27.5
+    ],
+    [
+      27.5,
+      28.35
+    ]
+  ],
+  "max_bandwidth_mhz": 400,
+  "component_carriers": 8,
+  "carrier_aggregation": true,
+  "mimo_config": "256T256R",
+  "active_elements": 256,
+  "beamforming_type": "Hybrid analog/digital",
+  "digital_streams": 64,
+  "eirp_dbm": 65,
+  "dl_peak_gbps": 20,
+  "dl_modulation": "256-QAM",
+  "dl_layers": 8,
+  "ul_peak_gbps": 5,
+  "ul_modulation": "64-QAM",
+  "ul_layers": 4,
+  "subcarrier_spacing_khz": 120,
+  "latency_ms": 1,
+  "latency_type": "URLLC",
+  "device_density_per_km2": 1000000,
+  "device_density_type": "mMTC",
+  "bbu_connection": "eCPRI over 25GbE fiber",
+  "fronthaul_split": "Option 7-2x",
+  "fronthaul_standard": "O-RAN",
+  "core_interface": "N2/N3",
+  "core_architecture": "SBA",
+  "sync_sources": [
+    "GPS",
+    "PTP (IEEE 1588v2)"
+  ],
+  "duplex_mode": "TDD",
+  "mounting": [
+    "Pole",
+    "Wall"
+  ],
+  "electrical_downtilt_deg": 15,
+  "panel_dimensions_mm": [
+    600,
+    600,
+    120
+  ],
+  "panel_weight_kg": 35,
+  "wind_rating_kmh": 200,
+  "power_vdc": -48,
+  "power_max_w": 1200,
+  "cooling": "Passive",
+  "ip_rating": "IP66",
+  "certifications": [
+    "3GPP Rel. 17",
+    "FCC Part 30",
+    "ETSI EN 302 217",
+    "RoHS"
+  ],
+  "acronyms_used": [
+    "NR",
+    "gNB",
+    "FR2",
+    "mmWave",
+    "mMIMO",
+    "CC",
+    "CA",
+    "EIRP",
+    "DL",
+    "UL",
+    "QAM",
+    "SCS",
+    "URLLC",
+    "mMTC",
+    "BBU",
+    "eCPRI",
+    "RRU",
+    "O-RAN",
+    "5GC",
+    "SBA",
+    "PTP",
+    "TDD",
+    "IP",
+    "3GPP",
+    "FCC",
+    "ETSI",
+    "RoHS"
+  ]
+}

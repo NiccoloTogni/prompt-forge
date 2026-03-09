@@ -9,7 +9,7 @@ It provides a high-level API for the full workflow.
         project.set_bundle_schema(input=".pdf", expected_output=".json")
         project.add_examples_from_directory("./training_data/")
         project.set_seed_prompt("Extract all fields from the document...")
-        project.train(batch_size=5, max_iterations=20)
+        project.train(config=TrainingConfig(batch_size=5, max_iterations=20))
 
         agent = project.get_inference_agent()
         result = agent.run(input_file="new_file.pdf")
@@ -220,39 +220,31 @@ class Project:
 
     def train(
         self,
-        batch_size: int = 5,
-        max_iterations: int = 20,
+        config: TrainingConfig | None = None,
         eval_strategy: str | Evaluator | None = "llm_judge",
         batch_strategy: BatchStrategy | None = None,
-        min_improvement: float = 0.01,
-        patience: int = 3,
-        eval_sample_size: int | None = None,
         inference_fn: Callable | None = None,
         on_iteration: Callable | None = None,
         optimizer_kwargs: dict | None = None,
-        max_tokens: int | None = None,
-        max_total_tokens: int | None = None,
     ) -> TrainingReport:
         """
         Run the incremental training loop.
 
         Args:
-            batch_size: Examples per iteration.
-            max_iterations: Maximum training iterations.
+            config: Full training configuration. Use ``TrainingConfig`` to control
+                    batch size, iterations, evaluation thresholds, token budgets,
+                    temperatures, and more. Defaults to ``TrainingConfig()`` (all defaults).
             eval_strategy: Evaluator instance or string shortcut
                           ("exact_match", "json_fields", "similarity", "llm_judge", "none").
-            batch_strategy: Batch selection strategy (default: random).
-            min_improvement: Minimum score delta to accept new prompt.
-            patience: Stop after N iterations without improvement.
-            eval_sample_size: Number of examples to evaluate on (None = all).
-            inference_fn: Custom inference function (prompt, bundle) -> str.
-            on_iteration: Callback after each iteration.
-            optimizer_kwargs: Extra kwargs for the PromptOptimizer (e.g. token_estimator).
-            max_tokens: Context window token limit per optimizer call. When set,
-                        the batch is trimmed to fit (warning logged). If a single
-                        example exceeds the budget alone, training fails with an error.
-            max_total_tokens: Total token budget for the entire training run. Training
-                              stops early with a warning when this limit is reached.
+                          Pass None or "none" to disable evaluation — training always runs
+                          max_iterations; min_improvement and patience are ignored.
+            batch_strategy: Batch selection strategy (default: RandomBatchStrategy).
+            inference_fn: Custom inference function ``(prompt_text, bundle) -> str``.
+                          Defaults to an LLM call using the project's client.
+            on_iteration: Optional callback called after each iteration with an
+                          ``IterationResult``.
+            optimizer_kwargs: Extra kwargs forwarded to ``PromptOptimizer``
+                              (e.g. ``token_estimator``).
 
         Returns:
             TrainingReport with per-iteration results and refinement signal.
@@ -262,6 +254,12 @@ class Project:
         if self.store.get_latest_prompt() is None:
             raise RuntimeError("No seed prompt set. Call set_seed_prompt() first.")
 
+        config = config or TrainingConfig()
+        # Inject output_schema from the project if not already set in config
+        if config.output_schema is None and self._output_schema is not None:
+            import dataclasses
+            config = dataclasses.replace(config, output_schema=self._output_schema)
+
         evaluator = self._resolve_evaluator(eval_strategy)
 
         optimizer = PromptOptimizer(
@@ -269,18 +267,8 @@ class Project:
             meta_prompt=self._meta_prompt,
             file_loader=self.file_loader,
             context=self._context,
+            temperature=config.optimizer_temperature,
             **(optimizer_kwargs or {}),
-        )
-
-        config = TrainingConfig(
-            batch_size=batch_size,
-            max_iterations=max_iterations,
-            min_improvement=min_improvement,
-            patience=patience,
-            eval_sample_size=eval_sample_size,
-            output_schema=self._output_schema,
-            max_tokens=max_tokens,
-            max_total_tokens=max_total_tokens,
         )
 
         pipeline = TrainingPipeline(

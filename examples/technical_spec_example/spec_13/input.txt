@@ -1,0 +1,27 @@
+ENGINEERING DATA SHEET — FORGEMASTER FM-X90 CNC MILLING CENTER
+
+Manufacturer: PrecisionTech Machinery
+Model: FM-X90-5AX
+Serial Prefix: PTM-X90
+Date: 2024-04-30
+
+The FM-X90 is a 5-axis VMC (Vertical Machining Center) with HSM (High-Speed Machining) capability for aerospace-grade titanium (Ti-6Al-4V) and Inconel machining. It features a DDM (Direct Drive Motor) rotary table and HSK (Hollow Taper Shank) tooling interface.
+
+Machine Specifications:
+- Axes: X=1200mm, Y=800mm, Z=600mm, A=±120°, C=360° (continuous)
+- Spindle: 20,000 RPM, 40 kW (S1 duty), HSK-A63 interface
+- Torque: 120 Nm @ 3,200 RPM (constant power range)
+- Feed Rate: Max 60 m/min (rapid), 30 m/min (cutting)
+- Acceleration: 1.2g on linear axes
+- ATC (Automatic Tool Changer): 60-tool magazine, T-T (Tool-to-Tool) 1.5 sec, C-C (Chip-to-Chip) 3.2 sec
+- Positioning Accuracy: ±3 µm (per ISO 230-2)
+- Repeatability: ±1.5 µm
+- Table Load: Max 500 kg
+- Coolant: Through-spindle TSC (Through-Spindle Coolant) @ 70 bar, MQL (Minimum Quantity Lubrication) optional
+- CNC Controller: Siemens SINUMERIK 840D sl with ShopMill GUI
+- Probing: Renishaw OMP60 (Optical Machine Probe) + RMP60 (Radio Machine Probe) for tool setting
+- Enclosure: Fully enclosed, CE (Conformité Européenne) marked, chip conveyor standard
+- Electrical: 400V 3-phase, 63A, 45 kVA connected load
+- Machine Weight: 12,500 kg
+- Footprint: 3200mm x 2800mm
+- Compliance: ISO 230-1 (geometric accuracy), ISO 10791-7 (5-axis), OSHA (Occupational Safety and Health Administration) compliant

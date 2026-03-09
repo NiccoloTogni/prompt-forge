@@ -18,30 +18,44 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from ..llm.client import LLMClient, LLMMessage
-from ..bundle import BundleCollection, ExampleBundle
+from ..bundle import BundleCollection, ExampleBundle, is_output_role
 from ..file_loaders import FileLoader, get_default_loader
 from ..storage.project_store import ProjectStore, PromptVersion
 from ..evaluation.evaluator import Evaluator, BatchEvalResult
-from .optimizer import PromptOptimizer
+from .optimizer import PromptOptimizer, OPTIMIZER_TEMPERATURE
 from .batch_strategy import BatchStrategy, RandomBatchStrategy
 from .training_log import TrainingLog, LogEntry
 
 logger = logging.getLogger(__name__)
 
+# ── Module-level defaults ─────────────────────────────────────────────────────
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_MAX_ITERATIONS = 20
+DEFAULT_MIN_IMPROVEMENT = 0.0        # Accept any improvement; ignored when evaluator is None
+DEFAULT_PATIENCE = 5                 # Early-stop after N non-improving iters; ignored when evaluator is None
+DEFAULT_REFINEMENT_THRESHOLD = 0.8   # Scores below this flag refinement_recommended=True
+DEFAULT_INFERENCE_TEMPERATURE = 0.0  # Deterministic inference during evaluation
+MAX_SUMMARY_ENTRIES = 15             # Number of recent iterations to include in optimizer context
+
 
 @dataclasses.dataclass
 class TrainingConfig:
     """Configuration for a training run."""
-    batch_size: int = 10
-    max_iterations: int = 20
-    min_improvement: float = 0.00  # Minimum score improvement to accept new prompt
-    patience: int = 5  # Stop after N iterations without improvement
-    eval_sample_size: int | None = None  # How many examples to evaluate on (None = all)
+    batch_size: int = DEFAULT_BATCH_SIZE
+    max_iterations: int = DEFAULT_MAX_ITERATIONS
+    min_improvement: float = DEFAULT_MIN_IMPROVEMENT  # Ignored when evaluator is None
+    patience: int = DEFAULT_PATIENCE                  # Ignored when evaluator is None
+    eval_sample_size: int | None = None   # Examples to evaluate on (None = all)
     auto_save: bool = True
-    output_schema: dict | None = None  # JSON schema if task requires structured output
-    refinement_threshold: float = 0.8  # Scores below this recommend human refinement
-    max_tokens: int | None = None  # Context window limit for optimizer; None disables check
-    max_total_tokens: int | None = None  # Budget for the whole run; None = unlimited
+    output_schema: dict | None = None     # JSON schema if task requires structured output
+    refinement_threshold: float = DEFAULT_REFINEMENT_THRESHOLD
+    max_tokens: int | None = None         # Per-call context window limit for optimizer
+    max_total_tokens: int | None = None   # Total token budget for the whole run
+    extract_learnings: bool = True        # Set False to skip the learnings-summary LLM call;
+                                          # a lightweight diff note is stored instead so
+                                          # training history remains populated
+    optimizer_temperature: float = OPTIMIZER_TEMPERATURE  # Temperature for optimizer calls
+    inference_temperature: float = DEFAULT_INFERENCE_TEMPERATURE  # Temperature for eval inference
 
 
 @dataclasses.dataclass
@@ -152,9 +166,10 @@ class TrainingPipeline:
             config: Training configuration.
 
         Returns:
-            List of results for each iteration.
+            TrainingReport with per-iteration results and refinement signal.
         """
         config = config or TrainingConfig()
+        self._inference_temperature = config.inference_temperature
         results: list[IterationResult] = []
         no_improvement_count = 0
 
@@ -209,10 +224,11 @@ class TrainingPipeline:
             opt_result = self.optimizer.optimize(
                 current_prompt=current_prompt,
                 examples=batch,
-                training_history=self.training_log.get_summary(max_entries=15),
+                training_history=self.training_log.get_summary(max_entries=MAX_SUMMARY_ENTRIES),
                 eval_feedback=eval_feedback,
                 output_schema=config.output_schema,
                 max_tokens=config.max_tokens,
+                extract_learnings=config.extract_learnings,
             )
             # Accumulate optimizer tokens (inference tokens are added inside _default_inference)
             self._total_tokens += self._count_tokens(opt_result.usage)
@@ -337,7 +353,7 @@ class TrainingPipeline:
                 expected = ""
                 # Find the expected output role
                 for role, content in contents.items():
-                    if "expected" in role.lower() or "output" in role.lower():
+                    if is_output_role(role):
                         expected = content.text
                         break
                 results.append((bundle.bundle_id, actual, expected))
@@ -354,7 +370,7 @@ class TrainingPipeline:
         # Find input role(s) — anything that's not "expected*" or "output*"
         input_parts = []
         for role, content in contents.items():
-            if not ("expected" in role.lower() or "output" in role.lower()):
+            if not is_output_role(role):
                 input_parts.append(f"<{role}>\n{content.text}\n</{role}>")
 
         user_content = "\n\n".join(input_parts)
@@ -364,7 +380,7 @@ class TrainingPipeline:
             LLMMessage(role="user", content=user_content),
         ]
 
-        response = self.llm.complete(messages, temperature=0.0)
+        response = self.llm.complete(messages, temperature=self._inference_temperature)
         if response.usage:
             self._total_tokens += (
                 response.usage.get("input_tokens", 0)

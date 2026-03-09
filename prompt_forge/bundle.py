@@ -19,6 +19,16 @@ from .file_loaders import FileLoader, FileContent, get_default_loader
 
 logger = logging.getLogger(__name__)
 
+# Role names containing these keywords are treated as expected/output roles.
+# All other roles are treated as input roles.
+OUTPUT_ROLE_KEYWORDS: tuple[str, ...] = ("expected", "output")
+
+
+def is_output_role(role: str) -> bool:
+    """Return True if the role name indicates an expected/output role."""
+    role_lower = role.lower()
+    return any(kw in role_lower for kw in OUTPUT_ROLE_KEYWORDS)
+
 
 @dataclasses.dataclass
 class BundleSchema:
@@ -170,10 +180,10 @@ class BundleCollection:
         # Try subdirectory layout first
         subdirs = [d for d in sorted(directory.iterdir()) if d.is_dir()]
         if subdirs:
-            logging.info(f"Loading bundles from subdirectories in {directory}...")
+            logger.info(f"Loading bundles from subdirectories in {directory}...")
             loaded = self._load_subdir_layout(subdirs)
         else:
-            logging.info(f"Loading bundles from flat layout in {directory}...")
+            logger.info(f"Loading bundles from flat layout in {directory}...")
             loaded = self._load_flat_layout(directory)
 
         return loaded

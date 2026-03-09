@@ -1,0 +1,98 @@
+{
+  "product_name": "Aethon AT-2200 Autonomous Mobile Robot",
+  "manufacturer": "FleetMind Robotics",
+  "model": "AT-2200-WH",
+  "hw_revision": "Rev E",
+  "date": "2024-11-15",
+  "category": "Autonomous Mobile Robot",
+  "application": [
+    "Warehouse",
+    "3PL logistics"
+  ],
+  "slam_type": "Visual-Inertial",
+  "slam_sensors": [
+    "Stereo cameras",
+    "IMU"
+  ],
+  "lidar_model": "RPLidar S2",
+  "lidar_range_m": 30,
+  "lidar_points_per_sec": 32000,
+  "depth_camera": "Intel RealSense D455",
+  "depth_range_m": [
+    0.4,
+    6
+  ],
+  "obstacle_detection": "3D TOF",
+  "obstacle_range_m": [
+    0.1,
+    4
+  ],
+  "odometry": [
+    "Wheel encoders",
+    "Visual odometry"
+  ],
+  "localization_accuracy_mm": 10,
+  "payload_capacity_kg": 2200,
+  "max_speed_loaded_m_s": 2.0,
+  "max_speed_unloaded_m_s": 2.5,
+  "turning_radius_m": 0,
+  "drive_type": "Differential",
+  "ramp_capability_deg": 5,
+  "lift_type": "Scissor lift",
+  "lift_stroke_mm": 250,
+  "compute_platform": "NVIDIA Jetson AGX Orin",
+  "ai_performance_tops": 275,
+  "middleware": "ROS2 Humble",
+  "os": "Ubuntu 22.04 LTS",
+  "fleet_management": "VDA 5050 compliant FMS",
+  "wireless": [
+    "Wi-Fi 6E",
+    "5G NR (optional)"
+  ],
+  "api": [
+    "REST",
+    "WebSocket"
+  ],
+  "wms_integration": true,
+  "safety_standard": "PLd/Cat.3 per ISO 13849",
+  "safety_certification": "ISO 3691-4",
+  "estop_rating": "SIL 2",
+  "battery_voltage_v": 48,
+  "battery_capacity_ah": 60,
+  "battery_energy_kwh": 2.88,
+  "battery_chemistry": "LFP",
+  "charge_time_80pct_min": 45,
+  "runtime_hours": [
+    8,
+    12
+  ],
+  "bms_interface": "CAN bus",
+  "dimensions_mm": {
+    "L": 1400,
+    "W": 850,
+    "H": 350
+  },
+  "weight_kg": 380,
+  "acronyms_used": [
+    "AMR",
+    "3PL",
+    "SLAM",
+    "IMU",
+    "LIDAR",
+    "RGB-D",
+    "TOF",
+    "VO",
+    "RMS",
+    "SBC",
+    "ROS2",
+    "FMS",
+    "VDA",
+    "NR",
+    "WMS",
+    "PLd",
+    "SIL",
+    "LFP",
+    "BMS",
+    "CAN"
+  ]
+}

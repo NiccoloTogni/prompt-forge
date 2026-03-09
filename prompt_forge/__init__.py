@@ -6,13 +6,13 @@ Instead of updating model weights, APE updates prompts — producing
 human-readable, versionable, editable "learned knowledge".
 
 Quick Start:
-    from ape import Project
+    from prompt_forge import Project
 
     project = Project("my_project", llm=my_llm_client)
     project.set_bundle_schema(input=".pdf", expected_output=".json")
     project.add_examples_from_directory("./training_data/")
     project.set_seed_prompt("Extract all fields from the document...")
-    project.train(batch_size=5, max_iterations=20)
+    project.train(config=TrainingConfig(batch_size=5, max_iterations=20))
 
     agent = project.get_inference_agent()
     result = agent.run(input_file="new_file.pdf")

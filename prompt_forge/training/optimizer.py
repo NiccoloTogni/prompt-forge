@@ -12,14 +12,19 @@ And produces an improved version of the prompt.
 
 import json
 import logging
-from typing import Any, Callable
+from typing import Callable
 
 from .prompt import DEFAULT_META_PROMPT
 from ..llm.client import LLMClient, LLMMessage
 from ..file_loaders import FileLoader, get_default_loader
-from ..bundle import ExampleBundle
+from ..bundle import ExampleBundle, is_output_role
 
-MAX_PROMPT_LENGTH = 5000  # rough token estimate to prevent OOM errors
+# ── Module-level defaults ─────────────────────────────────────────────────────
+MAX_PROMPT_LENGTH = 5000    # Max chars shown in learnings diff (not a token limit)
+OPTIMIZER_TEMPERATURE = 1   # Sampling temperature for the prompt-generation call
+LEARNINGS_TEMPERATURE = 1   # Sampling temperature for the learnings-summary call
+TOKEN_CHARS_PER_TOKEN = 4   # Chars-per-token ratio used by the built-in estimator
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,7 +41,7 @@ class PromptOptimizer:
         meta_prompt: str | None = None,
         file_loader: FileLoader | None = None,
         context: str = "",
-        llm_kwargs: dict[str, Any] | None = None,
+        temperature: float = OPTIMIZER_TEMPERATURE,
         token_estimator: Callable[[str], int] | None = None,
     ):
         """
@@ -45,17 +50,18 @@ class PromptOptimizer:
             meta_prompt: Custom meta-prompt for the optimizer. If None, uses default.
             file_loader: FileLoader for reading example files.
             context: Additional context about the task/domain.
-            llm_kwargs: Additional kwargs to pass to llm.complete() (e.g., temperature).
+            temperature: Sampling temperature for the prompt-generation LLM call.
+                         See OPTIMIZER_TEMPERATURE for the default value.
             token_estimator: Callable that estimates token count for a string.
-                             Defaults to len(text) // 4 (≈4 chars per token).
+                             Defaults to len(text) // TOKEN_CHARS_PER_TOKEN.
                              Provide a model-specific tokenizer for precise limits.
         """
         self.llm = llm
         self.meta_prompt = meta_prompt or DEFAULT_META_PROMPT
         self.file_loader = file_loader or get_default_loader()
         self.context = context
-        self.llm_kwargs = llm_kwargs or {"temperature": 0.2}
-        self.token_estimator = token_estimator or (lambda text: len(text) // 4)
+        self.temperature = temperature
+        self.token_estimator = token_estimator or (lambda text: len(text) // TOKEN_CHARS_PER_TOKEN)
 
     def optimize(
         self,
@@ -65,6 +71,7 @@ class PromptOptimizer:
         eval_feedback: str = "",
         output_schema: dict | None = None,
         max_tokens: int | None = None,
+        extract_learnings: bool = True,
     ) -> "OptimizerResult":
         """
         Produce an improved prompt based on examples and feedback.
@@ -79,6 +86,11 @@ class PromptOptimizer:
                         optimizer call. If any single example exceeds the budget
                         on its own, a ValueError is raised. If the full batch
                         exceeds the budget, it is trimmed and a warning is logged.
+            extract_learnings: If True (default), makes a second LLM call to
+                               summarize what changed and stores it in the training
+                               history. If False, a lightweight character-diff note
+                               is stored instead — the training history remains
+                               populated but less descriptive.
 
         Returns:
             OptimizerResult with the new prompt and learnings summary.
@@ -87,6 +99,7 @@ class PromptOptimizer:
         resolved_schema = output_schema or self._detect_output_schema(examples)
 
         # Enforce context-window budget before building the final message
+        # Potentially trims the example batch and logs a warning if it doesn't fit.
         if max_tokens is not None:
             examples = self._fit_examples_to_budget(
                 examples=examples,
@@ -112,14 +125,25 @@ class PromptOptimizer:
         ]
 
         logger.info(f"Optimizing prompt with {len(examples)} examples...")
-        response = self.llm.complete(messages, **self.llm_kwargs)
+        response = self.llm.complete(messages, temperature=self.temperature)
         new_prompt = response.text.strip()
 
-        # Summarize what was learned (second LLM call)
-        learnings, learnings_usage = self._extract_learnings(current_prompt, new_prompt, examples)
-
-        # Combine token usage from both calls
-        combined_usage = self._sum_usage(response.usage, learnings_usage)
+        # Optionally summarize what was learned (second LLM call — skippable to save tokens)
+        if extract_learnings:
+            learnings, learnings_usage = self._extract_learnings(current_prompt, new_prompt, examples)
+            combined_usage = self._sum_usage(response.usage, learnings_usage)
+        else:
+            # No LLM call — produce a minimal diff-based note so the training history
+            # isn't empty. Empty learnings would cause the optimizer to lose context
+            # about what changed in previous iterations.
+            added = len(new_prompt) - len(current_prompt)
+            learnings = (
+                f"Prompt revised from {len(current_prompt)} to {len(new_prompt)} chars "
+                f"({'+' if added >= 0 else ''}{added}). "
+                f"Trained on {len(examples)} example(s). "
+                "(Learnings extraction skipped.)"
+            )
+            combined_usage = response.usage
 
         return OptimizerResult(
             new_prompt=new_prompt,
@@ -244,7 +268,7 @@ class PromptOptimizer:
                 continue
 
             for role, content in contents.items():
-                if "expected" in role.lower() or "output" in role.lower():
+                if is_output_role(role):
                     total += 1
                     try:
                         parsed = json.loads(content.text.strip())
@@ -356,7 +380,7 @@ class PromptOptimizer:
             )),
         ]
 
-        response = self.llm.complete(messages, temperature=0.0)
+        response = self.llm.complete(messages, temperature=LEARNINGS_TEMPERATURE)
         return response.text.strip(), response.usage
 
     @staticmethod

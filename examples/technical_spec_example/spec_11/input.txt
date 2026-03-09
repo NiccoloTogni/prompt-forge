@@ -1,0 +1,33 @@
+SPECIFICATION SHEET — ROBOVAULT RV-8800 NAS STORAGE APPLIANCE
+
+Vendor: DataFort Systems
+Model: RV-8800-R2
+SKU: DFS-RV8800-64T
+Date: 2024-08-30
+
+The RV-8800 is an enterprise NAS (Network Attached Storage) appliance optimized for SMB (Small and Medium Business) and ROBO (Remote Office/Branch Office) deployments. It features a ZFS-based filesystem with inline dedup and compression.
+
+Storage Configuration:
+- Drive Bays: 8x 3.5" SATA (Serial ATA) III / SAS (Serial Attached SCSI) 12 Gbps
+- Max Raw Capacity: 8x 24TB = 192TB
+- RAID Levels: RAID 0, 1, 5, 6, 10, RAIDZ1, RAIDZ2, RAIDZ3
+- Cache: 2x M.2 NVMe SSD for L2ARC (Level 2 Adaptive Replacement Cache) read cache
+- SLOG (Separate Log): 1x M.2 NVMe for ZIL (ZFS Intent Log) write acceleration
+- Deduplication: Inline, SHA-256 (Secure Hash Algorithm) based
+- Compression: LZ4 (default), ZSTD (Zstandard) selectable
+- Snapshots: Unlimited COW (Copy-on-Write) snapshots, scheduled via cron
+
+Networking & Protocols:
+- NICs: 2x 10GbE SFP+ (built-in), 1x 1GbE RJ45 for IPMI (Intelligent Platform Management Interface)
+- File Protocols: SMB 3.1.1 (Server Message Block), NFS v4.2 (Network File System), AFP (Apple Filing Protocol), iSCSI (Internet Small Computer Systems Interface)
+- Authentication: AD (Active Directory), LDAP (Lightweight Directory Access Protocol), NIS
+- Backup: NDMP (Network Data Management Protocol), rsync, S3-compatible object storage
+
+System:
+- CPU: Intel Xeon D-2776NT, 16C/32T @ 2.1 GHz
+- RAM: 64GB DDR5 ECC RDIMM (Registered Dual Inline Memory Module)
+- OS: DataFort DSM (DiskStation Manager) v8.2 based on FreeBSD
+- PSU: Dual 550W 80 PLUS Gold, hot-swappable
+- Enclosure: 2U rackmount, front-to-back airflow
+- Noise: < 45 dB(A) typical
+- Warranty: 5 years NBD (Next Business Day) on-site

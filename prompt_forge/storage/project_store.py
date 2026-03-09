@@ -164,7 +164,7 @@ class SQLiteStore:
         try:
             self._conn.execute("ALTER TABLE prompt_versions ADD COLUMN output_schema TEXT")
             self._conn.commit()
-        except Exception:
+        except sqlite3.OperationalError:
             pass  # Column already exists
 
     def save_prompt_version(self, version: PromptVersion) -> None:

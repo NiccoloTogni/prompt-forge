@@ -1,0 +1,40 @@
+TECHNICAL SPECIFICATION — AETHON AT-2200 AUTONOMOUS MOBILE ROBOT
+
+Manufacturer: FleetMind Robotics
+Model: AT-2200-WH
+HW Revision: Rev E
+Date: 2024-11-15
+
+The AT-2200 is an AMR (Autonomous Mobile Robot) designed for intralogistics in warehouse and 3PL (Third-Party Logistics) environments. It uses SLAM (Simultaneous Localization and Mapping) with sensor fusion for navigation in dynamic spaces without fixed infrastructure.
+
+Navigation & Sensing:
+- SLAM: Visual-Inertial SLAM using stereo cameras + IMU (Inertial Measurement Unit)
+- LIDAR: 2D RPLidar S2, 360° scan, 30m range, 32K points/sec
+- Depth Camera: Intel RealSense D455, range 0.4–6m, RGB-D (Red Green Blue - Depth)
+- Obstacle Detection: 3D TOF (Time-of-Flight) arrays, front and rear, 0.1–4m range
+- Odometry: Dual wheel encoders + visual odometry (VO)
+- Localization Accuracy: ±10mm repeatable (RMS)
+
+Motion & Payload:
+- Payload Capacity: 2,200 kg
+- Max Speed: 2.0 m/s loaded, 2.5 m/s unloaded
+- Turning Radius: 0m (differential drive, in-place rotation)
+- Ramp Capability: Up to 5° incline loaded
+- Lift Mechanism: Integrated scissor lift, 250mm stroke
+
+Compute & Communication:
+- SBC (Single Board Computer): NVIDIA Jetson AGX Orin, 275 TOPS AI performance
+- Middleware: ROS2 Humble on Ubuntu 22.04 LTS
+- Fleet Management: Proprietary FMS (Fleet Management System), VDA 5050 compliant
+- Communication: Wi-Fi 6E (802.11ax 6GHz), 5G NR (New Radio) module optional
+- API: REST + WebSocket for WMS (Warehouse Management System) integration
+- Safety: PLd/Cat.3 per ISO 13849, certified per ISO 3691-4 (driverless trucks)
+- E-stop: Dual-channel SIL 2 (Safety Integrity Level) rated
+
+Power:
+- Battery: 48V 60Ah LFP, 2.88 kWh
+- Charging: Auto-docking, opportunity charging, 0–80% in 45 min
+- Runtime: 8–12 hours depending on load profile
+- BMS: Integrated with CAN bus telemetry
+- Dimensions: 1400mm (L) x 850mm (W) x 350mm (H, lowered)
+- Weight: 380 kg (without payload)

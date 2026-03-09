@@ -1,0 +1,86 @@
+{
+  "product_name": "GridLink GLI-5000 Solar Inverter",
+  "manufacturer": "SunForce Energy Systems",
+  "model_number": "GLI-5000-TL3",
+  "firmware_version": "v4.2.1",
+  "release_date": "2024-02-28",
+  "category": "3-phase Transformerless String Inverter",
+  "application": "Commercial PV installations",
+  "max_system_size_kwp": 500,
+  "mppt_count": 2,
+  "max_dc_input_kw": 550,
+  "mppt_voltage_range_v": [
+    200,
+    1000
+  ],
+  "max_input_current_per_mppt_a": 26,
+  "strings_per_mppt": 2,
+  "max_dc_short_circuit_current_a": 40,
+  "rated_ac_output_kva": 500,
+  "rated_ac_output_kw": 500,
+  "ac_voltage_v": 480,
+  "ac_configuration": "WYE",
+  "thd_pct": 3,
+  "frequency_range_hz": [
+    47,
+    63
+  ],
+  "max_efficiency_pct": 98.8,
+  "euro_efficiency_pct": 98.4,
+  "mppt_efficiency_pct": 99.5,
+  "night_consumption_w": 5,
+  "anti_islanding_standards": [
+    "UL 1741 SA",
+    "IEEE 1547-2018"
+  ],
+  "grid_support_features": [
+    "LVRT",
+    "HVRT",
+    "Q(U)",
+    "P(f)"
+  ],
+  "communication": [
+    "RS-485",
+    "Ethernet",
+    "Wi-Fi",
+    "Modbus TCP/RTU"
+  ],
+  "sunspec_compliant": true,
+  "monitoring_protocol": "MQTT",
+  "protections": [
+    "AFCI",
+    "GFDI",
+    "SPD Type II"
+  ],
+  "enclosure": [
+    "IP65",
+    "NEMA 3R"
+  ],
+  "operating_temp_min_c": -25,
+  "operating_temp_max_c": 60,
+  "derating_above_c": 50,
+  "certifications": [
+    "UL 1741",
+    "IEC 62109-1/-2",
+    "NEC 690",
+    "FCC Part 15 Class B"
+  ],
+  "acronyms_used": [
+    "TL",
+    "PV",
+    "MPPT",
+    "PF",
+    "THD",
+    "LVRT",
+    "HVRT",
+    "DAS",
+    "MQTT",
+    "AFCI",
+    "GFDI",
+    "SPD",
+    "NEMA",
+    "NEC",
+    "FCC",
+    "IEEE"
+  ]
+}

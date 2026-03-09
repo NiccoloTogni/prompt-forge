@@ -68,9 +68,11 @@ notebooks/tests_/*
 # Debug sandbox
 debug.py
 debug_data/
-examples/
+examples/local_
 
 # streamlit artifacts
 .prompt_forge_ui.json
+
+.projects/*
 
 !.gitkeep
