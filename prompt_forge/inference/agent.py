@@ -134,14 +134,17 @@ class InferenceAgent:
             A dict if output_schema is set (JSON parsed), otherwise a plain string.
         """
         user_content = self._build_user_content(input_text, input_file, input_files, extra_context)
-        response = self._call_single(self._build_system(), user_content)
+        system = self._build_system()
+        if self.output_schema:
+            system += "\n\nRespond ONLY with valid JSON. Do not include any explanation or text outside the JSON object."
+        response = self._call_single(system, user_content)
         return self._post_process(response.text)
 
     def run_batch(
         self,
         inputs: list[dict],
         max_tokens: int | None = None,
-    ) -> "list[str | dict]":
+    ) -> list:
         """
         Run inference on multiple inputs in a single LLM call (chunked if max_tokens is set).
 
@@ -151,11 +154,12 @@ class InferenceAgent:
             max_tokens: Token budget per LLM call. If None, all inputs are sent at once.
 
         Returns:
-            List of outputs — strings, or dicts when output_schema is set.
+            list[str] when output_schema is None.
+            list[dict] when output_schema is set — each element is a parsed JSON object,
+            equivalent to calling run() on each input individually.
         """
         user_contents = [self._build_user_content(**kw) for kw in inputs]
-        raw_outputs = self._batch_call(user_contents, max_tokens)
-        return [self._post_process(o) for o in raw_outputs]
+        return self._batch_call(user_contents, max_tokens)
 
     def run_bundle(self, bundle: ExampleBundle) -> str:
         """
@@ -187,50 +191,78 @@ class InferenceAgent:
             List of output strings in the same order as the input bundles.
         """
         user_contents = [self._bundle_to_user_content(b) for b in bundles]
-        return self._batch_call(user_contents, max_tokens)
+        return [
+            json.dumps(o) if isinstance(o, dict) else str(o)
+            for o in self._batch_call(user_contents, max_tokens)
+        ]
 
     # ── Internal: batch call ──────────────────────────────────────────────────
 
-    def _batch_call(self, user_contents: list[str], max_tokens: int | None) -> list[str]:
-        """Single-call (or chunked) batch over pre-built user content strings."""
+    def _batch_call(self, user_contents: list[str], max_tokens: int | None) -> list:
+        """Single-call (or chunked) batch over pre-built user content strings.
+
+        Returns list[str] when output_schema is None, list[dict] when output_schema is set.
+        """
         if not user_contents:
             return []
+        if len(user_contents) == 1:
+            response = self._call_single(self._build_system(), user_contents[0])
+            return [self._post_process(response.text)]
         if max_tokens is not None:
             return self._chunked_batch(user_contents, max_tokens)
         return self._single_batch_call(user_contents)
 
-    def _single_batch_call(self, user_contents: list[str]) -> list[str]:
-        """Send all inputs in one LLM call; parse per-output XML tags."""
+    def _single_batch_call(self, user_contents: list[str]) -> list:
+        """Send all inputs in one LLM call; parse a JSON array response.
+
+        Returns a list of strings (no output_schema) or dicts (output_schema set).
+        Raises ValueError / json.JSONDecodeError on parse failure or wrong item count,
+        which triggers the sequential fallback in the pipeline.
+        """
         n = len(user_contents)
         input_blocks = "\n\n".join(
             f'<input id="{i}">\n{content}\n</input>'
             for i, content in enumerate(user_contents, 1)
         )
-        expected_fmt = "\n".join(
-            f'<output id="{i}">your output for input {i}</output>'
-            for i in range(1, n + 1)
-        )
+
+        if self.output_schema:
+            format_instruction = (
+                f"Return a JSON array of exactly {n} objects. "
+                f"Each object must follow the output schema. "
+                f"Respond with ONLY the JSON array, no surrounding text:\n"
+                f'[{{"field": "value"}}, {{"field": "value"}}, ...]'
+            )
+        else:
+            format_instruction = (
+                f"Return a JSON array of exactly {n} strings, one per input, in order. "
+                f"Respond with ONLY the JSON array, no surrounding text:\n"
+                f'["output for input 1", "output for input 2", ...]'
+            )
+
         user_message = (
             f"You will receive {n} independent inputs. Process each one according to your "
             f"instructions and produce an output for every input.\n\n"
-            f"Respond using EXACTLY this format — one block per input, in order:\n\n"
-            f"{expected_fmt}\n\n"
+            f"{format_instruction}\n\n"
             f"{input_blocks}"
         )
         response = self._call_single(self._build_system(), user_message)
 
-        outputs = []
-        for i in range(1, n + 1):
-            match = re.search(rf'<output id="{i}">(.*?)</output>', response.text, re.DOTALL)
-            outputs.append(self._strip_code_fences(match.group(1).strip()) if match else "")
+        # Strip optional code fence, then parse the JSON array
+        text = response.text.strip()
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+        if fence_match:
+            text = fence_match.group(1).strip()
 
-        missing = sum(1 for o in outputs if not o)
-        if missing:
-            logger.warning(f"Batch inference: {missing}/{n} outputs missing or empty")
+        outputs = json.loads(text)  # raises json.JSONDecodeError on failure → triggers fallback
+
+        if not isinstance(outputs, list):
+            raise ValueError(f"Batch inference: expected JSON array, got {type(outputs).__name__}")
+        if len(outputs) != n:
+            raise ValueError(f"Batch inference: expected {n} outputs, got {len(outputs)}")
 
         return outputs
 
-    def _chunked_batch(self, user_contents: list[str], max_tokens: int) -> list[str]:
+    def _chunked_batch(self, user_contents: list[str], max_tokens: int) -> list:
         """Group inputs into token-budget chunks and run one batch call per chunk."""
         system_tokens = self.token_estimator(self._build_system())
         instruction_overhead = 300  # conservative estimate for batch wrapper text
@@ -264,7 +296,7 @@ class InferenceAgent:
             chunks.append(current_chunk)
 
         logger.info(f"Batch inference: {len(user_contents)} inputs → {len(chunks)} chunk(s)")
-        all_outputs: list[str] = []
+        all_outputs: list = []
         for chunk in chunks:
             all_outputs.extend(self._single_batch_call(chunk))
         return all_outputs
@@ -286,8 +318,6 @@ class InferenceAgent:
 
     def _build_system(self) -> str:
         system = self.prompt_text
-        if self.output_schema:
-            system += "\n\nRespond ONLY with valid JSON. Do not include any explanation or text outside the JSON object."
         if self.system_suffix:
             system += "\n\n" + self.system_suffix
         return system
@@ -316,7 +346,7 @@ class InferenceAgent:
         parts = []
         if extra_context:
             parts.append(f"<additional_context>\n{extra_context}\n</additional_context>")
-        if input_text:
+        if input_text is not None:
             parts.append(input_text)
         elif input_file:
             content = self.file_loader.load(input_file)

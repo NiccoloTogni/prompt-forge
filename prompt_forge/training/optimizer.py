@@ -67,6 +67,7 @@ class PromptOptimizer:
         self.context = context
         self.temperature = temperature
         self.token_estimator = token_estimator or (lambda text: len(text) // TOKEN_CHARS_PER_TOKEN)
+        self._detected_schema: dict | None = None  # cached after first successful detection
 
     def optimize(
         self,
@@ -97,7 +98,13 @@ class PromptOptimizer:
         Returns:
             OptimizerResult with the new prompt, learnings, and issues.
         """
-        resolved_schema = output_schema or self._detect_output_schema(examples)
+        if output_schema is not None:
+            resolved_schema = output_schema
+        elif self._detected_schema is not None:
+            resolved_schema = self._detected_schema
+        else:
+            self._detected_schema = self._detect_output_schema(examples)
+            resolved_schema = self._detected_schema
 
         if max_tokens is not None:
             examples = self._fit_examples_to_budget(

@@ -160,8 +160,10 @@ class Project:
         This is saved as version 0 in the prompt store.
         """
         self._seed_prompt = prompt
-        # Save as version 0 if no versions exist yet
-        if self.store.get_latest_prompt() is None:
+        # Always write version 0 — overwrite if it already exists so the store
+        # stays in sync with the config (prevents drift on repeated calls).
+        existing = self.store.get_prompt_version(0)
+        if existing is None or existing.metadata.get("is_seed"):
             version = PromptVersion(
                 version=0,
                 prompt_text=prompt,
@@ -226,6 +228,7 @@ class Project:
         inference_fn: Callable | None = None,
         on_iteration: Callable | None = None,
         optimizer_kwargs: dict | None = None,
+        val_bundles=None,
     ) -> TrainingReport:
         """
         Run the incremental training loop.
@@ -274,7 +277,6 @@ class Project:
         pipeline = TrainingPipeline(
             llm=self.llm,
             store=self.store,
-            bundles=self._bundles,
             evaluator=evaluator,
             optimizer=optimizer,
             batch_strategy=batch_strategy or RandomBatchStrategy(),
@@ -284,7 +286,7 @@ class Project:
             on_iteration=on_iteration,
         )
 
-        return pipeline.train(config)
+        return pipeline.train(self._bundles, val_bundles=val_bundles, config=config)
 
     # ── Inference ─────────────────────────────────────────────────────
 

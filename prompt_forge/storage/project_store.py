@@ -254,3 +254,9 @@ class SQLiteStore:
 
     def close(self):
         self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()

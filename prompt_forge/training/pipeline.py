@@ -46,7 +46,6 @@ class TrainingConfig:
     max_iterations: int = DEFAULT_MAX_ITERATIONS
     min_improvement: float = DEFAULT_MIN_IMPROVEMENT  # Ignored when evaluator is None
     patience: int = DEFAULT_PATIENCE                  # Ignored when evaluator is None
-    val_size: int | None = None           # Validation set size (sampled once at start; None = all)
     val_max_tokens: int | None = None     # Max tokens per batch eval call (None = no limit)
     auto_save: bool = True
     output_schema: dict | None = None     # JSON schema if task requires structured output
@@ -105,21 +104,22 @@ class TrainingPipeline:
     """
     Orchestrates the incremental prompt training loop.
 
+    Holds infrastructure only — training and validation data are passed to train().
+
     Usage:
         pipeline = TrainingPipeline(
             llm=my_llm,
             store=my_store,
-            bundles=my_bundles,
             evaluator=my_evaluator,
         )
-        pipeline.train(config=TrainingConfig(batch_size=5, max_iterations=20))
+        train_bundles, val_bundles = all_bundles.train_val_split(val_ratio=0.2, seed=42)
+        pipeline.train(train_bundles, val_bundles, config=TrainingConfig(batch_size=5))
     """
 
     def __init__(
         self,
         llm: LLMClient,
         store: ProjectStore,
-        bundles: BundleCollection,
         evaluator: Evaluator | None = None,
         optimizer: PromptOptimizer | None = None,
         batch_strategy: BatchStrategy | None = None,
@@ -132,7 +132,6 @@ class TrainingPipeline:
         Args:
             llm: LLM client for both optimization and inference.
             store: Storage backend for prompt versions and state.
-            bundles: Collection of training examples.
             evaluator: Strategy for scoring outputs.
             optimizer: Custom prompt optimizer (default: PromptOptimizer with defaults).
             batch_strategy: How to select batches (default: RandomBatchStrategy).
@@ -145,7 +144,6 @@ class TrainingPipeline:
         """
         self.llm = llm
         self.store = store
-        self.bundles = bundles
         self.evaluator = evaluator
         self.file_loader = file_loader or get_default_loader()
         self.context = context
@@ -167,12 +165,17 @@ class TrainingPipeline:
 
     def train(
         self,
+        train_bundles: BundleCollection | list[ExampleBundle],
+        *,
+        val_bundles: BundleCollection | list[ExampleBundle] | None = None,
         config: TrainingConfig | None = None,
     ) -> TrainingReport:
         """
         Run the training loop.
 
         Args:
+            train_bundles: Training examples used for optimization.
+            val_bundles: Validation examples used for scoring (optional).
             config: Training configuration.
 
         Returns:
@@ -180,6 +183,15 @@ class TrainingPipeline:
         """
         config = config or TrainingConfig()
         results: list[IterationResult] = []
+
+        # Resolve train_bundles to a flat list
+        if isinstance(train_bundles, BundleCollection):
+            _train_list = train_bundles.bundles
+        else:
+            _train_list = list(train_bundles)
+
+        if not _train_list:
+            raise RuntimeError("train_bundles is empty — provide at least one training example.")
 
         # Build the eval agent once — reused across all iterations (prompt_text is updated per eval)
         llm_kwargs = {}
@@ -193,6 +205,7 @@ class TrainingPipeline:
             token_estimator=self.optimizer.token_estimator,
         )
         no_improvement_count = 0
+        _failed_batch_ids: list[str] = []  # IDs from the last non-improving batch
 
         # Get starting prompt
         current = self.store.get_latest_prompt()
@@ -205,11 +218,23 @@ class TrainingPipeline:
         current_prompt = current.prompt_text
         current_version = current.version
 
-        # Sample the validation set once — reused every iteration for consistent scoring
-        val_bundles = self._sample_val_set(config.val_size)
+        # Resolve val_bundles to a flat list
+        if isinstance(val_bundles, BundleCollection):
+            _val_list = val_bundles.bundles
+        elif val_bundles is not None:
+            _val_list = list(val_bundles)
+        else:
+            _val_list = []
+
+        if self.evaluator is not None and not _val_list:
+            logger.warning(
+                "An evaluator is set but no val_bundles were provided — "
+                "evaluation will be skipped. Pass val_bundles to enable scoring."
+            )
+
         logger.info(
-            f"Starting training: {len(self.bundles)} examples, "
-            f"val_size={len(val_bundles)}, "
+            f"Starting training: {len(_train_list)} train examples, "
+            f"val_size={len(_val_list)}, "
             f"batch_size={config.batch_size}, max_iterations={config.max_iterations}"
         )
 
@@ -218,9 +243,10 @@ class TrainingPipeline:
 
             # 1. Select batch
             batch = self.batch_strategy.select_batch(
-                bundles=self.bundles.bundles,
+                bundles=_train_list,
                 batch_size=config.batch_size,
                 used_ids=self.training_log.get_all_used_bundle_ids(),
+                failed_ids=_failed_batch_ids,
             )
             batch_ids = [b.bundle_id for b in batch]
             logger.info(f"Selected batch: {batch_ids}")
@@ -228,8 +254,8 @@ class TrainingPipeline:
             # 2. Evaluate current prompt (optional, for scoring)
             score_before = None
             eval_feedback = ""
-            if self.evaluator is not None and val_bundles:
-                eval_result = self._evaluate_prompt(current_prompt, val_bundles, config.val_max_tokens)
+            if self.evaluator is not None and _val_list:
+                eval_result = self._evaluate_prompt(current_prompt, _val_list, config.val_max_tokens)
                 score_before = eval_result.mean_score
                 if eval_result.failed_examples:
                     feedback_lines = [
@@ -262,8 +288,8 @@ class TrainingPipeline:
             score_after = None
             improved = False
             new_eval_result = None
-            if self.evaluator is not None and val_bundles:
-                new_eval_result = self._evaluate_prompt(opt_result.new_prompt, val_bundles, config.val_max_tokens)
+            if self.evaluator is not None and _val_list:
+                new_eval_result = self._evaluate_prompt(opt_result.new_prompt, _val_list, config.val_max_tokens)
                 score_after = new_eval_result.mean_score
                 improved = (
                     score_before is None
@@ -279,6 +305,7 @@ class TrainingPipeline:
                 current_version += 1
                 current_prompt = opt_result.new_prompt
                 no_improvement_count = 0
+                _failed_batch_ids = []
 
                 # Save new version
                 version = PromptVersion(
@@ -296,6 +323,7 @@ class TrainingPipeline:
                 logger.info(f"Saved prompt version {current_version}")
             else:
                 no_improvement_count += 1
+                _failed_batch_ids = batch_ids  # retry these with FailurePriorityBatchStrategy
                 logger.info(f"Prompt not improved ({no_improvement_count}/{config.patience})")
 
             # 6. Update training log
@@ -357,14 +385,6 @@ class TrainingPipeline:
             ),
             total_tokens_used=self._total_tokens,
         )
-
-    def _sample_val_set(self, val_size: int | None) -> list[ExampleBundle]:
-        """Sample the validation set once at the start of training."""
-        import random
-        bundles = self.bundles.bundles
-        if val_size is not None and val_size < len(bundles):
-            return random.sample(bundles, val_size)
-        return list(bundles)
 
     def _evaluate_prompt(
         self,

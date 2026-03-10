@@ -13,10 +13,13 @@ Users can implement custom evaluators by subclassing Evaluator.
 import dataclasses
 import difflib
 import json
+import re
 from abc import ABC, abstractmethod
 from typing import Any
 
 from ..llm.client import LLMClient, LLMMessage
+
+DEFAULT_PASS_THRESHOLD = 0.75
 
 
 @dataclasses.dataclass
@@ -139,7 +142,7 @@ class JsonFieldEvaluator(Evaluator):
 
     def __init__(
         self,
-        pass_threshold: float = 0.8,
+        pass_threshold: float = DEFAULT_PASS_THRESHOLD,
         ignore_fields: list[str] | None = None,
         case_sensitive: bool = False,
     ):
@@ -243,7 +246,7 @@ class SimilarityEvaluator(Evaluator):
     Good for free-text outputs where exact match is too strict.
     """
 
-    def __init__(self, pass_threshold: float = 0.85):
+    def __init__(self, pass_threshold: float = DEFAULT_PASS_THRESHOLD):
         self.pass_threshold = pass_threshold
 
     def evaluate(self, actual: str, expected: str, **kwargs) -> EvalResult:
@@ -265,7 +268,7 @@ class LLMJudgeEvaluator(Evaluator):
     def __init__(
         self,
         llm: LLMClient,
-        pass_threshold: float = 0.8,
+        pass_threshold: float = DEFAULT_PASS_THRESHOLD,
         task_description: str = "",
     ):
         self.llm = llm
@@ -301,13 +304,11 @@ Respond in this exact JSON format (no other text):
         )
 
         try:
-            # Strip markdown code fences if present
             text = response.text.strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1]
-                if text.endswith("```"):
-                    text = text[:-3]
-            result = json.loads(text.strip())
+            fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+            if fence_match:
+                text = fence_match.group(1).strip()
+            result: dict = json.loads(text)
             score = float(result.get("score", 0.0))
             return EvalResult(
                 score=score,

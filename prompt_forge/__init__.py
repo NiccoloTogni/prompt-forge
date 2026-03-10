@@ -21,6 +21,7 @@ Quick Start:
 __version__ = "0.1.0"
 
 from .project import Project
+from .utils import train_val_split
 from .inference.agent import InferenceAgent
 from .bundle import BundleSchema, BundleCollection, ExampleBundle
 from .llm.client import LLMClient, LLMResponse, LLMMessage
@@ -52,6 +53,7 @@ __all__ = [
     # Core
     "Project",
     "InferenceAgent",
+    "train_val_split",
     # LLM
     "LLMClient",
     "LLMResponse",
