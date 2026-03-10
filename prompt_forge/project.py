@@ -222,18 +222,26 @@ class Project:
 
     def train(
         self,
+        train_bundles=None,
+        *,
+        val_bundles=None,
         config: TrainingConfig | None = None,
         eval_strategy: str | Evaluator | None = "llm_judge",
         batch_strategy: BatchStrategy | None = None,
         inference_fn: Callable | None = None,
         on_iteration: Callable | None = None,
         optimizer_kwargs: dict | None = None,
-        val_bundles=None,
     ) -> TrainingReport:
         """
         Run the incremental training loop.
 
         Args:
+            train_bundles: Training examples. Defaults to all loaded examples
+                           (``project.bundles``). Pass an explicit subset — e.g. the
+                           output of ``train_val_split`` — to keep validation examples
+                           out of the optimizer's view.
+            val_bundles: Validation examples used for scoring. When provided,
+                         ``patience`` and ``min_improvement`` become effective.
             config: Full training configuration. Use ``TrainingConfig`` to control
                     batch size, iterations, evaluation thresholds, token budgets,
                     temperatures, and more. Defaults to ``TrainingConfig()`` (all defaults).
@@ -256,6 +264,9 @@ class Project:
             raise RuntimeError("No training examples loaded.")
         if self.store.get_latest_prompt() is None:
             raise RuntimeError("No seed prompt set. Call set_seed_prompt() first.")
+
+        if train_bundles is None:
+            train_bundles = self._bundles
 
         config = config or TrainingConfig()
         # Inject output_schema from the project if not already set in config
@@ -286,7 +297,7 @@ class Project:
             on_iteration=on_iteration,
         )
 
-        return pipeline.train(self._bundles, val_bundles=val_bundles, config=config)
+        return pipeline.train(train_bundles, val_bundles=val_bundles, config=config)
 
     # ── Inference ─────────────────────────────────────────────────────
 

@@ -166,13 +166,14 @@ from prompt_forge import TrainingConfig, train_val_split
 train_bundles, val_bundles = train_val_split(project.bundles, val_ratio=0.2, seed=42)
 
 report = project.train(
+    train_bundles,
+    val_bundles=val_bundles,
     config=TrainingConfig(
         batch_size=5,        # Examples per optimizer call
         max_iterations=20,   # Hard stop
         patience=3,          # Stop after 3 non-improving iterations
     ),
     eval_strategy="json_fields",   # Field-by-field JSON comparison
-    val_bundles=val_bundles,
 )
 
 for r in report:
@@ -355,10 +356,13 @@ train_bundles, val_bundles = train_val_split(
 train_bundles, val_bundles = train_val_split(project.bundles, val_size=10, seed=42)
 
 report = project.train(
-    config=TrainingConfig(batch_size=5),
+    train_bundles,
     val_bundles=val_bundles,
+    config=TrainingConfig(batch_size=5),
 )
 ```
+
+Pass both `train_bundles` and `val_bundles` so the optimizer only sees training examples while scoring uses the held-out set. Omitting `train_bundles` falls back to all loaded examples.
 
 > **Note:** if `val_bundles` is not provided, the evaluator is skipped and `min_improvement` / `patience` have no effect — all `max_iterations` will run.
 

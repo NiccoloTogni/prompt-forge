@@ -112,8 +112,8 @@ class TrainingPipeline:
             store=my_store,
             evaluator=my_evaluator,
         )
-        train_bundles, val_bundles = all_bundles.train_val_split(val_ratio=0.2, seed=42)
-        pipeline.train(train_bundles, val_bundles, config=TrainingConfig(batch_size=5))
+        train_bundles, val_bundles = train_val_split(all_bundles, val_ratio=0.2, seed=42)
+        pipeline.train(train_bundles, val_bundles=val_bundles, config=TrainingConfig(batch_size=5))
     """
 
     def __init__(

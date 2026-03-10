@@ -28,7 +28,7 @@ def train_val_split(
 
     Example:
         train_bundles, val_bundles = train_val_split(project.bundles, val_ratio=0.2, seed=42)
-        project.train(config=TrainingConfig(...), val_bundles=val_bundles)
+        project.train(train_bundles, val_bundles=val_bundles, config=TrainingConfig(...))
     """
     all_bundles = collection.bundles
     if not all_bundles:
