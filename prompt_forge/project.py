@@ -368,6 +368,11 @@ class Project:
         return self.store.get_latest_prompt()
 
     @property
+    def bundles(self) -> BundleCollection | None:
+        """The loaded example collection, or None if no schema has been set."""
+        return self._bundles
+
+    @property
     def num_examples(self) -> int:
         """Number of loaded training examples."""
         return len(self._bundles) if self._bundles else 0

@@ -158,21 +158,33 @@ print(f"Loaded {project.num_examples} examples")
 
 ### 4. Train
 
+Split your examples into training and validation sets, then run the loop:
+
 ```python
+from prompt_forge import TrainingConfig, train_val_split
+
+train_bundles, val_bundles = train_val_split(project.bundles, val_ratio=0.2, seed=42)
+
 report = project.train(
-    batch_size=5,                    # Examples per optimizer call
-    max_iterations=20,               # Hard stop
-    eval_strategy="json_fields",     # Field-by-field JSON comparison
-    patience=3,                      # Stop after 3 non-improving iterations
+    config=TrainingConfig(
+        batch_size=5,        # Examples per optimizer call
+        max_iterations=20,   # Hard stop
+        patience=3,          # Stop after 3 non-improving iterations
+    ),
+    eval_strategy="json_fields",   # Field-by-field JSON comparison
+    val_bundles=val_bundles,
 )
 
 for r in report:
     status = "✓" if r.improved else "✗"
-    print(f"Iter {r.iteration}: {r.score_before:.2f} → {r.score_after:.2f} {status}")
+    before = f"{r.score_before:.2f}" if r.score_before is not None else "—"
+    after  = f"{r.score_after:.2f}"  if r.score_after  is not None else "—"
+    print(f"Iter {r.iteration}: {before} → {after} {status}")
 
 # Training signals whether human review is recommended
 if report.refinement_recommended:
-    print(f"Score {report.final_score:.2f} — consider running project.refine()")
+    score_str = f"{report.final_score:.2f}" if report.final_score is not None else "unknown"
+    print(f"Score {score_str} — consider running project.refine()")
 ```
 
 ### 5. Run inference
@@ -272,7 +284,7 @@ Prevent optimizer calls from exceeding your model's context window:
 
 ```python
 report = project.train(
-    max_tokens=100_000,   # Hard limit for the optimizer call
+    config=TrainingConfig(max_tokens=100_000),   # Hard limit for the optimizer call
 )
 ```
 
@@ -286,7 +298,7 @@ import tiktoken
 enc = tiktoken.encoding_for_model("gpt-4o")
 
 report = project.train(
-    max_tokens=128_000,
+    config=TrainingConfig(max_tokens=128_000),
     optimizer_kwargs={"token_estimator": lambda text: len(enc.encode(text))},
 )
 ```
@@ -323,6 +335,32 @@ class MyEvaluator(Evaluator):
 
 project.train(eval_strategy=MyEvaluator())
 ```
+
+---
+
+### Train / validation split
+
+Use `train_val_split` to create a reproducible split before training. Pass the val set explicitly so you control exactly which examples are used for scoring:
+
+```python
+from prompt_forge import train_val_split, TrainingConfig
+
+train_bundles, val_bundles = train_val_split(
+    project.bundles,
+    val_ratio=0.2,   # 20% held out for evaluation
+    seed=42,         # reproducible across runs
+)
+
+# Or fix the exact number of val examples:
+train_bundles, val_bundles = train_val_split(project.bundles, val_size=10, seed=42)
+
+report = project.train(
+    config=TrainingConfig(batch_size=5),
+    val_bundles=val_bundles,
+)
+```
+
+> **Note:** if `val_bundles` is not provided, the evaluator is skipped and `min_improvement` / `patience` have no effect — all `max_iterations` will run.
 
 ---
 
@@ -412,6 +450,7 @@ def my_inference(prompt_text: str, bundle) -> str:
     return call_my_pipeline(prompt_text, input_text)
 
 project.train(
+    config=TrainingConfig(batch_size=5, max_iterations=20),
     on_iteration=on_iteration,
     inference_fn=my_inference,
 )
@@ -426,6 +465,7 @@ prompt_forge/
 ├── __init__.py              # Public API
 ├── project.py               # Project — main entry point
 ├── bundle.py                # ExampleBundle, BundleSchema, BundleCollection
+├── utils.py                 # train_val_split and other helpers
 ├── llm/
 │   └── client.py            # LLMClient protocol (provider-agnostic)
 ├── file_loaders/
