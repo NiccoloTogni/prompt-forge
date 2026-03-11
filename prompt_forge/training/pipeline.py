@@ -14,6 +14,7 @@ it left off using the stored training state.
 
 import dataclasses
 import logging
+import random
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -54,6 +55,8 @@ class TrainingConfig:
     max_total_tokens: int | None = None   # Total token budget for the whole run
     optimizer_temperature: float = OPTIMIZER_TEMPERATURE  # Temperature for optimizer calls
     inference_temperature: float | None = DEFAULT_INFERENCE_TEMPERATURE  # None = use model default
+    seed: int | None = None               # Random seed for reproducible batch selection
+    max_prompt_chars: int | None = None   # Trigger consolidation when prompt exceeds this length
 
 
 @dataclasses.dataclass
@@ -148,7 +151,6 @@ class TrainingPipeline:
         self.file_loader = file_loader or get_default_loader()
         self.context = context
         self._custom_inference_fn = inference_fn  # None → use InferenceAgent (batch-capable)
-        self.inference_fn = inference_fn           # kept for backward compatibility
         self.on_iteration = on_iteration
 
         self.optimizer = optimizer or PromptOptimizer(
@@ -182,6 +184,11 @@ class TrainingPipeline:
             TrainingReport with per-iteration results and refinement signal.
         """
         config = config or TrainingConfig()
+
+        if config.seed is not None:
+            random.seed(config.seed)
+
+        _tokens_at_start = self._total_tokens
         results: list[IterationResult] = []
 
         # Resolve train_bundles to a flat list
@@ -307,6 +314,20 @@ class TrainingPipeline:
                 no_improvement_count = 0
                 _failed_batch_ids = []
 
+                # Consolidate if prompt has grown too large
+                if (
+                    config.max_prompt_chars is not None
+                    and len(current_prompt) > config.max_prompt_chars
+                ):
+                    logger.info(
+                        f"Prompt length ({len(current_prompt):,} chars) exceeds "
+                        f"max_prompt_chars={config.max_prompt_chars:,}. Consolidating..."
+                    )
+                    consolidation_result = self.optimizer.consolidate(current_prompt)
+                    self._total_tokens += self._count_tokens(consolidation_result.usage)
+                    current_prompt = consolidation_result.new_prompt
+                    logger.info(f"Consolidated to {len(current_prompt):,} chars.")
+
                 # Save new version
                 version = PromptVersion(
                     version=current_version,
@@ -383,7 +404,7 @@ class TrainingPipeline:
             refinement_recommended=(
                 final_score is None or final_score < config.refinement_threshold
             ),
-            total_tokens_used=self._total_tokens,
+            total_tokens_used=self._total_tokens - _tokens_at_start,
         )
 
     def _evaluate_prompt(
@@ -407,7 +428,10 @@ class TrainingPipeline:
             try:
                 actuals = self._eval_agent.run_bundle_batch(val_bundles, val_max_tokens)
             except Exception as e:
-                logger.warning(f"Batch inference failed ({e}), falling back to sequential")
+                logger.warning(
+                    f"Batch inference failed ({e}), falling back to sequential. "
+                    f"Enable DEBUG logging to see the raw LLM response."
+                )
                 actuals = [self._eval_agent.run_bundle(b) for b in val_bundles]
             self._total_tokens += self._eval_agent.tokens_used - tokens_before
         else:

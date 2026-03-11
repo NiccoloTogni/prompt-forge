@@ -185,7 +185,7 @@ for r in report:
 # Training signals whether human review is recommended
 if report.refinement_recommended:
     score_str = f"{report.final_score:.2f}" if report.final_score is not None else "unknown"
-    print(f"Score {score_str} — consider running project.refine()")
+    print(f"Score {score_str} — consider reviewing and editing the prompt manually")
 ```
 
 ### 5. Run inference
@@ -236,49 +236,6 @@ project.set_output_schema({
 
 ---
 
-### Human interactive refinement
-
-After automated training converges, use `project.refine()` to start an interactive session where you give direct feedback on the prompt:
-
-```python
-report = project.train(...)
-
-if report.refinement_recommended:
-    result = project.refine()
-    print(f"Revised {result.num_revisions} times, saved versions: {result.saved_versions}")
-```
-
-**Session commands:**
-
-| Input | Effect |
-|---|---|
-| Any text | Revise the prompt based on that feedback |
-| `test` | Run on a random example and show the output |
-| `test <id>` | Run on a specific example |
-| `show` | Display the full current prompt |
-| `save` | Save the current prompt as a new version |
-| `done` / `quit` | End the session |
-
-For non-CLI environments (Jupyter, web apps), pass custom `input_fn` / `output_fn` callbacks:
-
-```python
-result = project.refine(
-    input_fn=my_widget.get_input,
-    output_fn=my_widget.display,
-)
-```
-
-Or use `InteractiveOptimizer` directly without a full project:
-
-```python
-from prompt_forge import InteractiveOptimizer
-
-optimizer = InteractiveOptimizer(llm=my_llm, store=my_store, bundles=my_bundles)
-result = optimizer.run_session(prompt_text=my_prompt)
-```
-
----
-
 ### Context window management
 
 Prevent optimizer calls from exceeding your model's context window:
@@ -308,13 +265,37 @@ The default estimator uses `len(text) // 4` (~4 chars/token).
 
 ---
 
+### Reproducibility
+
+Set a `seed` to make batch selection deterministic across runs:
+
+```python
+report = project.train(
+    config=TrainingConfig(seed=42),
+)
+```
+
+---
+
+### Prompt consolidation
+
+After many iterations the optimizer accumulates rules and the prompt grows. Set `max_prompt_chars` to automatically trigger a consolidation step whenever the prompt exceeds that length — redundant and overlapping rules are merged while keeping all distinct coverage:
+
+```python
+report = project.train(
+    config=TrainingConfig(max_prompt_chars=8_000),
+)
+```
+
+---
+
 ### Evaluation strategies
 
 ```python
 # Field-by-field JSON comparison — ideal for data extraction
 project.train(eval_strategy="json_fields")
 
-# Text similarity (difflib ratio)
+# Token F1 similarity — robust to word order, good for free-text tasks
 project.train(eval_strategy="similarity")
 
 # LLM-as-judge — most flexible
@@ -335,6 +316,22 @@ class MyEvaluator(Evaluator):
         return EvalResult(score=score, passed=score > 0.8)
 
 project.train(eval_strategy=MyEvaluator())
+```
+
+`SimilarityEvaluator` supports three methods:
+
+```python
+from prompt_forge import SimilarityEvaluator
+
+# Default: token F1 (ROUGE-1) — no dependencies, good for free-text
+project.train(eval_strategy=SimilarityEvaluator(method="token"))
+
+# Character-level difflib — only useful when exact character fidelity matters
+project.train(eval_strategy=SimilarityEvaluator(method="char"))
+
+# Semantic cosine similarity — best quality, requires an embedding function
+embed = lambda text: my_embedding_model.encode(text).tolist()
+project.train(eval_strategy=SimilarityEvaluator(method="embedding", embed_fn=embed))
 ```
 
 ---
@@ -483,8 +480,6 @@ prompt_forge/
 │   └── agent.py             # InferenceAgent — uses trained prompts
 ├── evaluation/
 │   └── evaluator.py         # Evaluation strategies
-├── interactive/
-│   └── optimizer.py         # InteractiveOptimizer — human refinement
 └── storage/
     └── project_store.py     # FileSystemStore + SQLiteStore backends
 ```

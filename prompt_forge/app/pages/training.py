@@ -125,7 +125,7 @@ def _render_report(report):
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Iterations", len(report.iterations))
-    c2.metric("Final score", f"{report.final_score:.3f}" if report.final_score else "N/A")
+    c2.metric("Final score", f"{report.final_score:.3f}" if report.final_score is not None else "N/A")
     c3.metric("Total tokens", f"{report.total_tokens_used:,}")
     c4.metric("Refine recommended", "Yes" if report.refinement_recommended else "No")
 

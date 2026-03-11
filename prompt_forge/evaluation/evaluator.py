@@ -4,7 +4,7 @@ Evaluation strategies for comparing actual vs expected output.
 Built-in evaluators:
     - ExactMatchEvaluator: Exact string match (after normalization)
     - JsonFieldEvaluator: Field-by-field JSON comparison
-    - SimilarityEvaluator: Text similarity (difflib)
+    - SimilarityEvaluator: Token F1 / char difflib / embedding cosine similarity
     - LLMJudgeEvaluator: Uses an LLM to score output quality
 
 Users can implement custom evaluators by subclassing Evaluator.
@@ -13,9 +13,11 @@ Users can implement custom evaluators by subclassing Evaluator.
 import dataclasses
 import difflib
 import json
+import math
 import re
 from abc import ABC, abstractmethod
-from typing import Any
+from collections import Counter
+from typing import Any, Callable
 
 from ..llm.client import LLMClient, LLMMessage
 
@@ -241,21 +243,89 @@ class JsonFieldEvaluator(Evaluator):
 
 class SimilarityEvaluator(Evaluator):
     """
-    Text similarity using difflib SequenceMatcher.
+    Text similarity evaluator with three methods:
 
-    Good for free-text outputs where exact match is too strict.
+    - ``"token"`` (default): Token F1 score (ROUGE-1 style). Measures unigram overlap
+      between actual and expected. Robust to word order and paraphrasing; good for
+      free-text tasks. No external dependencies.
+    - ``"char"``: Character-level difflib ratio. Sensitive to exact character matches;
+      only useful when character-level fidelity matters.
+    - ``"embedding"``: Cosine similarity between vector embeddings. Best for semantic
+      equivalence. Requires passing ``embed_fn``.
+
+    Args:
+        pass_threshold: Minimum score to count as passed (default 0.75).
+        method: One of ``"token"``, ``"char"``, ``"embedding"``.
+        embed_fn: Required when ``method="embedding"``. A callable that takes a string
+                  and returns a list of floats (the embedding vector).
     """
 
-    def __init__(self, pass_threshold: float = DEFAULT_PASS_THRESHOLD):
+    def __init__(
+        self,
+        pass_threshold: float = DEFAULT_PASS_THRESHOLD,
+        method: str = "token",
+        embed_fn: Callable[[str], list[float]] | None = None,
+    ):
+        if method not in ("token", "char", "embedding"):
+            raise ValueError(f"method must be 'token', 'char', or 'embedding', got {method!r}")
+        if method == "embedding" and embed_fn is None:
+            raise ValueError("embed_fn is required when method='embedding'")
         self.pass_threshold = pass_threshold
+        self.method = method
+        self.embed_fn = embed_fn
 
     def evaluate(self, actual: str, expected: str, **kwargs) -> EvalResult:
-        ratio = difflib.SequenceMatcher(None, actual.strip(), expected.strip()).ratio()
+        if self.method == "token":
+            score = self._token_f1(actual.strip(), expected.strip())
+        elif self.method == "char":
+            score = difflib.SequenceMatcher(None, actual.strip(), expected.strip()).ratio()
+        else:  # embedding
+            vec_a = self.embed_fn(actual.strip())
+            vec_b = self.embed_fn(expected.strip())
+            score = self._cosine(vec_a, vec_b)
+
         return EvalResult(
-            score=ratio,
-            passed=ratio >= self.pass_threshold,
-            feedback=f"Similarity: {ratio:.1%}" + ("" if ratio >= self.pass_threshold else f" (threshold: {self.pass_threshold:.1%})"),
+            score=score,
+            passed=score >= self.pass_threshold,
+            feedback=(
+                f"Similarity ({self.method}): {score:.1%}"
+                + ("" if score >= self.pass_threshold else f" (threshold: {self.pass_threshold:.1%})")
+            ),
         )
+
+    @staticmethod
+    def _token_f1(actual: str, expected: str) -> float:
+        """Unigram F1 (ROUGE-1): harmonic mean of token precision and recall."""
+        def tokenize(text: str) -> list[str]:
+            return re.findall(r"\b\w+\b", text.lower())
+
+        a_tokens = tokenize(actual)
+        e_tokens = tokenize(expected)
+
+        if not a_tokens and not e_tokens:
+            return 1.0
+        if not a_tokens or not e_tokens:
+            return 0.0
+
+        a_counts = Counter(a_tokens)
+        e_counts = Counter(e_tokens)
+        overlap = sum((a_counts & e_counts).values())
+
+        precision = overlap / len(a_tokens)
+        recall = overlap / len(e_tokens)
+        if precision + recall == 0:
+            return 0.0
+        return 2 * precision * recall / (precision + recall)
+
+    @staticmethod
+    def _cosine(vec_a: list[float], vec_b: list[float]) -> float:
+        """Cosine similarity between two vectors."""
+        dot = sum(a * b for a, b in zip(vec_a, vec_b))
+        norm_a = math.sqrt(sum(x * x for x in vec_a))
+        norm_b = math.sqrt(sum(x * x for x in vec_b))
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return max(0.0, min(1.0, dot / (norm_a * norm_b)))
 
 
 class LLMJudgeEvaluator(Evaluator):

@@ -35,7 +35,6 @@ from .evaluation.evaluator import (
     SimilarityEvaluator,
 )
 from .inference.agent import InferenceAgent
-from .interactive.optimizer import InteractiveOptimizer, InteractiveSessionResult
 
 logger = logging.getLogger(__name__)
 
@@ -325,45 +324,6 @@ class Project:
             version=version,
             file_loader=self.file_loader,
             **kwargs,
-        )
-
-    def refine(
-        self,
-        version: int | None = None,
-        input_fn: Callable[[], str] = input,
-        output_fn: Callable[[str], None] = print,
-    ) -> InteractiveSessionResult:
-        """
-        Start an interactive human refinement session on a trained prompt.
-
-        Shortcut for::
-
-            optimizer = InteractiveOptimizer(llm=..., store=..., bundles=...)
-            result = optimizer.run_session(prompt_text=...)
-
-        Args:
-            version: Prompt version to refine, or None for the latest.
-            input_fn: Reads human input. Defaults to built-in input().
-            output_fn: Displays output. Defaults to print().
-
-        Returns:
-            InteractiveSessionResult with the final prompt and session history.
-        """
-        prompt_version = self.get_prompt(version)
-        if prompt_version is None:
-            raise RuntimeError("No prompt found. Run train() or set_seed_prompt() first.")
-
-        optimizer = InteractiveOptimizer(
-            llm=self.llm,
-            store=self.store,
-            file_loader=self.file_loader,
-            bundles=self._bundles,
-            context=self._context,
-        )
-        return optimizer.run_session(
-            prompt_text=prompt_version.prompt_text,
-            input_fn=input_fn,
-            output_fn=output_fn,
         )
 
     # ── Prompt History ────────────────────────────────────────────────

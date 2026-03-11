@@ -13,12 +13,13 @@ And produces in a single LLM call:
     - A list of issues/gaps that could not be resolved
 """
 
+import dataclasses
 import json
 import logging
 import re
 from typing import Callable
 
-from .prompt import DEFAULT_META_PROMPT
+from .prompt import DEFAULT_META_PROMPT, CONSOLIDATION_META_PROMPT
 from ..llm.client import LLMClient, LLMMessage
 from ..file_loaders import FileLoader, get_default_loader
 from ..bundle import ExampleBundle, is_output_role
@@ -106,9 +107,12 @@ class PromptOptimizer:
             self._detected_schema = self._detect_output_schema(examples)
             resolved_schema = self._detected_schema
 
+        # Pre-render all examples once to avoid double file I/O
+        rendered = [(ex, self._render_example(ex)) for ex in examples]
+
         if max_tokens is not None:
-            examples = self._fit_examples_to_budget(
-                examples=examples,
+            rendered = self._fit_rendered_to_budget(
+                rendered=rendered,
                 current_prompt=current_prompt,
                 training_history=training_history,
                 eval_feedback=eval_feedback,
@@ -118,7 +122,7 @@ class PromptOptimizer:
 
         user_content = self._build_user_message(
             current_prompt=current_prompt,
-            examples=examples,
+            rendered=rendered,
             training_history=training_history,
             eval_feedback=eval_feedback,
             output_schema=resolved_schema,
@@ -200,23 +204,23 @@ class PromptOptimizer:
             logger.warning(f"Failed to load example {example.bundle_id}: {e}")
         return "\n".join(parts)
 
-    def _fit_examples_to_budget(
+    def _fit_rendered_to_budget(
         self,
-        examples: list[ExampleBundle],
+        rendered: list[tuple[ExampleBundle, str]],
         current_prompt: str,
         training_history: str,
         eval_feedback: str,
         output_schema: dict | None,
         max_tokens: int,
-    ) -> list[ExampleBundle]:
+    ) -> list[tuple[ExampleBundle, str]]:
         """
-        Trim the example batch to fit within the token budget.
+        Trim pre-rendered examples to fit within the token budget.
 
         Raises:
             ValueError: If a single example already exceeds the token budget on its own.
 
         Returns:
-            A (possibly shorter) list of examples that fits in the budget.
+            A (possibly shorter) list of (example, rendered_str) pairs that fits in the budget.
             If trimmed, a warning is logged.
         """
         overhead_parts = []
@@ -249,9 +253,8 @@ class PromptOptimizer:
                 "Reduce context, training_history, or increase max_tokens."
             )
 
-        for example in examples:
-            rendered = self._render_example(example)
-            example_tokens = self._estimate_tokens(rendered)
+        for example, rendered_str in rendered:
+            example_tokens = self._estimate_tokens(rendered_str)
             if example_tokens > remaining_budget:
                 raise ValueError(
                     f"Example '{example.bundle_id}' is too large to fit in the context window "
@@ -259,20 +262,19 @@ class PromptOptimizer:
                     "Reduce example size or increase max_tokens."
                 )
 
-        fitted: list[ExampleBundle] = []
+        fitted: list[tuple[ExampleBundle, str]] = []
         used_tokens = 0
-        for example in examples:
-            rendered = self._render_example(example)
-            example_tokens = self._estimate_tokens(rendered)
+        for example, rendered_str in rendered:
+            example_tokens = self._estimate_tokens(rendered_str)
             if used_tokens + example_tokens > remaining_budget:
                 logger.warning(
-                    f"Batch trimmed from {len(examples)} to {len(fitted)} examples to fit within "
+                    f"Batch trimmed from {len(rendered)} to {len(fitted)} examples to fit within "
                     f"max_tokens={max_tokens} (estimated total: "
                     f"{fixed_tokens + used_tokens} tokens). "
                     "Consider reducing batch_size or increasing max_tokens."
                 )
                 break
-            fitted.append(example)
+            fitted.append((example, rendered_str))
             used_tokens += example_tokens
 
         return fitted
@@ -331,12 +333,12 @@ class PromptOptimizer:
     def _build_user_message(
         self,
         current_prompt: str,
-        examples: list[ExampleBundle],
+        rendered: list[tuple[ExampleBundle, str]],
         training_history: str,
         eval_feedback: str,
         output_schema: dict | None = None,
     ) -> str:
-        """Assemble the full context for the optimizer."""
+        """Assemble the full context for the optimizer from pre-rendered examples."""
         sections = []
 
         if self.context:
@@ -365,33 +367,46 @@ class PromptOptimizer:
             )
 
         sections.append("<examples>")
-        for i, example in enumerate(examples, 1):
+        for i, (example, rendered_str) in enumerate(rendered, 1):
             sections.append(f"\n--- Example {i} (ID: {example.bundle_id}) ---")
-            try:
-                contents = example.load_contents(self.file_loader)
-                for role, content in contents.items():
-                    sections.append(f"\n<{role}>\n{content.text}\n</{role}>")
-            except Exception as e:
-                sections.append(f"\n[Error loading example {example.bundle_id}: {e}]")
-                logger.warning(f"Failed to load example {example.bundle_id}: {e}")
+            sections.append(rendered_str)
         sections.append("\n</examples>")
 
         return "\n\n".join(sections)
 
+    # ── Consolidation ─────────────────────────────────────────────────────────
 
+    def consolidate(self, prompt: str) -> "OptimizerResult":
+        """
+        Compress a grown prompt by merging redundant/overlapping rules.
+
+        Preserves all distinct coverage while reducing length. Called automatically
+        by the pipeline when ``TrainingConfig.max_prompt_chars`` is exceeded.
+
+        Returns:
+            OptimizerResult with the consolidated prompt (learnings/issues are empty).
+        """
+        messages = [
+            LLMMessage(role="system", content=CONSOLIDATION_META_PROMPT),
+            LLMMessage(role="user", content=prompt),
+        ]
+        response = self.llm.complete(messages, temperature=0.2)
+        consolidated = response.text.strip()
+        if not consolidated:
+            logger.warning("Consolidation returned empty response — keeping original prompt.")
+            consolidated = prompt
+        return OptimizerResult(
+            new_prompt=consolidated,
+            learnings="",
+            usage=response.usage,
+        )
+
+
+@dataclasses.dataclass
 class OptimizerResult:
     """Result from a single optimization step."""
-
-    def __init__(
-        self,
-        new_prompt: str,
-        learnings: str,
-        issues: str = "",
-        output_schema: dict | None = None,
-        usage: dict[str, int] | None = None,
-    ):
-        self.new_prompt = new_prompt
-        self.learnings = learnings
-        self.issues = issues
-        self.output_schema = output_schema
-        self.usage = usage
+    new_prompt: str
+    learnings: str
+    issues: str = ""
+    output_schema: dict | None = None
+    usage: dict[str, int] | None = None

@@ -3,7 +3,26 @@
 import streamlit as st
 
 from prompt_forge.app.state import require_project, require_llm
-from prompt_forge.interactive.optimizer import DEFAULT_INTERACTIVE_META_PROMPT
+
+_REFINEMENT_META_PROMPT = """\
+You are an expert Prompt Engineer working interactively with a human.
+
+You will be given:
+1. The current version of a system prompt
+2. Direct feedback from the human describing what is wrong or what to improve
+
+Your job is to produce an improved version of the prompt that addresses the
+human's feedback precisely.
+
+CRITICAL RULES:
+- Preserve ALL existing rules in the current prompt unless the feedback
+  explicitly says a rule is wrong.
+- Only ADD or REFINE based on the feedback — do not remove things not mentioned.
+- Be specific: translate vague feedback into concrete, unambiguous rules.
+
+Respond with ONLY the improved system prompt text, nothing else.
+Do not wrap it in markdown code fences or add any preamble.\
+"""
 
 
 def show() -> None:
@@ -81,7 +100,7 @@ def _revise(llm, current_prompt: str, feedback: str) -> str:
     from prompt_forge import LLMMessage
 
     messages = [
-        LLMMessage(role="system", content=DEFAULT_INTERACTIVE_META_PROMPT),
+        LLMMessage(role="system", content=_REFINEMENT_META_PROMPT),
         LLMMessage(
             role="user",
             content=(

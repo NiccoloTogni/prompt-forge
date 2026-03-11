@@ -32,7 +32,6 @@ from .storage.project_store import (
     PromptVersion,
 )
 from .training.pipeline import TrainingPipeline, TrainingConfig, TrainingReport, IterationResult
-from .interactive.optimizer import InteractiveOptimizer, InteractiveSessionResult
 from .training.optimizer import PromptOptimizer
 from .training.batch_strategy import (
     BatchStrategy,
@@ -80,9 +79,6 @@ __all__ = [
     "RandomBatchStrategy",
     "FailurePriorityBatchStrategy",
     "TrainingLog",
-    # Interactive refinement
-    "InteractiveOptimizer",
-    "InteractiveSessionResult",
     # Evaluation
     "Evaluator",
     "EvalResult",

@@ -247,11 +247,20 @@ class InferenceAgent:
         )
         response = self._call_single(self._build_system(), user_message)
 
-        # Strip optional code fence, then parse the JSON array
+        # Strip optional code fence, then parse the JSON array.
+        # If the LLM prepends prose before the array, fall back to extracting
+        # the first [...] block found anywhere in the response.
         text = response.text.strip()
+        logger.debug(f"Batch inference raw response (first 500 chars): {text[:500]!r}")
+
         fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
         if fence_match:
             text = fence_match.group(1).strip()
+
+        if not text.startswith("["):
+            array_match = re.search(r"(\[[\s\S]*\])", text)
+            if array_match:
+                text = array_match.group(1).strip()
 
         outputs = json.loads(text)  # raises json.JSONDecodeError on failure → triggers fallback
 
