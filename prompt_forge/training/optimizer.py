@@ -193,8 +193,8 @@ class PromptOptimizer:
         return self.token_estimator(text)
 
     def _render_example(self, example: ExampleBundle) -> str:
-        """Render a single example bundle to its string representation."""
-        parts = [f"\n--- Example (ID: {example.bundle_id}) ---"]
+        """Render a single example bundle's content (no header — caller adds it)."""
+        parts = []
         try:
             contents = example.load_contents(self.file_loader)
             for role, content in contents.items():

@@ -14,7 +14,6 @@ it left off using the stored training state.
 
 import dataclasses
 import logging
-import random
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -184,9 +183,6 @@ class TrainingPipeline:
             TrainingReport with per-iteration results and refinement signal.
         """
         config = config or TrainingConfig()
-
-        if config.seed is not None:
-            random.seed(config.seed)
 
         _tokens_at_start = self._total_tokens
         results: list[IterationResult] = []

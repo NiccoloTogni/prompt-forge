@@ -289,7 +289,7 @@ class Project:
             store=self.store,
             evaluator=evaluator,
             optimizer=optimizer,
-            batch_strategy=batch_strategy or RandomBatchStrategy(),
+            batch_strategy=batch_strategy or RandomBatchStrategy(seed=config.seed),
             file_loader=self.file_loader,
             context=self._context,
             inference_fn=inference_fn,
