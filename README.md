@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="resources/promptforge-logo.svg" width="200" alt="PromptForge logo"/>
+  <img src="resources/promptforge-logo.png" width="500" alt="PromptForge logo"/>
 </p>
 
-<h1 align="center">PromptForge</h1>
+<!-- <h1 align="center">PromptForge</h1> -->
 <p align="center"><em>Iterative, example-based prompt optimization — no fine-tuning required.</em></p>
 
 <p align="center">
