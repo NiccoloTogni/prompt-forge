@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install prompt-forge openai python-dotenv pyinstaller
+          pip install -e . openai python-dotenv pyinstaller
 
       - name: Build exe
         run: |
