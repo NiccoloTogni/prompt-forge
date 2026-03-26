@@ -5,7 +5,7 @@ Usage:
     python cv_ranker.py
 
 Requirements:
-    pip install prompt-forge openai python-dotenv
+    pip install prompt-forge openai python-dotenv ttkthemes  # openai package includes AzureOpenAI
 """
 
 import os
@@ -14,7 +14,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AzureOpenAI
+from ttkthemes import ThemedTk
 
 load_dotenv()
 
@@ -48,8 +49,12 @@ Use this exact format for each entry:
 
 
 # ── LLM factory ───────────────────────────────────────────────────────────────
-def make_llm(api_key: str, model: str):
-    client = OpenAI(api_key=api_key)
+def make_llm(api_key: str, model: str, endpoint: str):
+    client = AzureOpenAI(
+        api_key=api_key,
+        azure_endpoint=endpoint,
+        api_version="2024-02-01",
+    )
 
     def llm(messages: list[LLMMessage]) -> LLMResponse:
         response = client.chat.completions.create(
@@ -68,13 +73,12 @@ def make_llm(api_key: str, model: str):
 
 
 # ── App ────────────────────────────────────────────────────────────────────────
-class CVRankerApp(tk.Tk):
+class CVRankerApp(ThemedTk):
     def __init__(self):
-        super().__init__()
+        super().__init__(theme="breeze")
         self.title("CV Ranker — prompt-forge")
         self.geometry("1100x700")
         self.minsize(800, 500)
-        self.configure(bg="#f5f5f5")
 
         self._cvs: list[dict] = []   # {"name": str, "text": str}
         self._running = False
@@ -87,18 +91,32 @@ class CVRankerApp(tk.Tk):
         top = ttk.Frame(self, padding=(10, 6))
         top.pack(fill="x", side="top")
 
-        ttk.Label(top, text="OpenAI API Key:").pack(side="left")
-        self._api_key_var = tk.StringVar(value=os.environ.get("OPENAI_API_KEY", ""))
-        api_entry = ttk.Entry(top, textvariable=self._api_key_var, width=42, show="*")
-        api_entry.pack(side="left", padx=(4, 16))
+        ttk.Label(top, text="Azure Endpoint:").pack(side="left")
+        self._endpoint_var = tk.StringVar(value=os.environ.get("AZURE_OPENAI_ENDPOINT", ""))
+        ttk.Entry(top, textvariable=self._endpoint_var, width=36).pack(side="left", padx=(4, 16))
 
-        ttk.Label(top, text="Model:").pack(side="left")
-        self._model_var = tk.StringVar(value="gpt-4o-mini")
+        ttk.Label(top, text="API Key:").pack(side="left")
+        self._api_key_var = tk.StringVar(value=os.environ.get("AZURE_OPENAI_API_KEY", ""))
+        ttk.Entry(top, textvariable=self._api_key_var, width=28, show="*").pack(side="left", padx=(4, 16))
+
+        ttk.Label(top, text="Deployment:").pack(side="left")
+        self._model_var = tk.StringVar(value=os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini"))
         ttk.Entry(top, textvariable=self._model_var, width=16).pack(side="left", padx=(4, 16))
 
         ttk.Label(top, text="Batch size:").pack(side="left")
         self._batch_var = tk.IntVar(value=3)
         ttk.Spinbox(top, from_=1, to=20, textvariable=self._batch_var, width=5).pack(side="left", padx=(4, 0))
+
+        ttk.Separator(self, orient="horizontal").pack(fill="x")
+
+        # Second row: project dir
+        top2 = ttk.Frame(self, padding=(10, 4))
+        top2.pack(fill="x", side="top")
+        ttk.Label(top2, text="Project dir:").pack(side="left")
+        self._project_dir_var = tk.StringVar(value=".cv_ranker_project")
+        ttk.Entry(top2, textvariable=self._project_dir_var, width=40).pack(side="left", padx=(4, 4))
+        ttk.Button(top2, text="Browse…", command=self._browse_project_dir).pack(side="left")
+        ttk.Label(top2, text="(reuse the same dir to resume a previous ranking)", foreground="gray").pack(side="left", padx=(12, 0))
 
         ttk.Separator(self, orient="horizontal").pack(fill="x")
 
@@ -122,9 +140,10 @@ class CVRankerApp(tk.Tk):
 
     def _build_left(self, parent):
         # Hiring criteria
-        ttk.Label(parent, text="Hiring Criteria", font=("", 10, "bold")).pack(anchor="w")
-        self._criteria_text = scrolledtext.ScrolledText(parent, height=8, wrap="word", font=("", 9))
-        self._criteria_text.pack(fill="x", pady=(2, 8))
+        criteria_frame = ttk.LabelFrame(parent, text="Hiring Criteria", padding=6)
+        criteria_frame.pack(fill="x", pady=(0, 6))
+        self._criteria_text = scrolledtext.ScrolledText(criteria_frame, height=8, wrap="word", font=("", 9))
+        self._criteria_text.pack(fill="x")
         self._criteria_text.insert("1.0", (
             "We are hiring a Senior Machine Learning Engineer.\n\n"
             "Ideal profile:\n"
@@ -134,32 +153,30 @@ class CVRankerApp(tk.Tk):
             "- Team leadership preferred"
         ))
 
-        ttk.Separator(parent, orient="horizontal").pack(fill="x", pady=4)
-
         # Add CV
-        ttk.Label(parent, text="Add Candidate CV", font=("", 10, "bold")).pack(anchor="w")
+        add_frame = ttk.LabelFrame(parent, text="Add Candidate CV", padding=6)
+        add_frame.pack(fill="x", pady=(0, 6))
 
-        name_row = ttk.Frame(parent)
-        name_row.pack(fill="x", pady=(2, 2))
+        name_row = ttk.Frame(add_frame)
+        name_row.pack(fill="x", pady=(0, 4))
         ttk.Label(name_row, text="Name:").pack(side="left")
         self._cv_name_var = tk.StringVar()
         ttk.Entry(name_row, textvariable=self._cv_name_var, width=28).pack(side="left", padx=(4, 0))
 
-        self._cv_text = scrolledtext.ScrolledText(parent, height=7, wrap="word", font=("", 9))
-        self._cv_text.pack(fill="x", pady=(2, 4))
+        self._cv_text = scrolledtext.ScrolledText(add_frame, height=6, wrap="word", font=("", 9))
+        self._cv_text.pack(fill="x", pady=(0, 4))
 
-        btn_row = ttk.Frame(parent)
+        btn_row = ttk.Frame(add_frame)
         btn_row.pack(fill="x")
         ttk.Button(btn_row, text="Add CV", command=self._add_cv).pack(side="left", padx=(0, 4))
         ttk.Button(btn_row, text="Load from file…", command=self._load_cv_file).pack(side="left")
 
-        ttk.Separator(parent, orient="horizontal").pack(fill="x", pady=6)
-
         # CV list
-        ttk.Label(parent, text="Loaded CVs", font=("", 10, "bold")).pack(anchor="w")
-        list_frame = ttk.Frame(parent)
-        list_frame.pack(fill="both", expand=True)
+        list_outer = ttk.LabelFrame(parent, text="Loaded CVs", padding=6)
+        list_outer.pack(fill="both", expand=True, pady=(0, 6))
 
+        list_frame = ttk.Frame(list_outer)
+        list_frame.pack(fill="both", expand=True)
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical")
         self._cv_listbox = tk.Listbox(
             list_frame, yscrollcommand=scrollbar.set,
@@ -169,29 +186,29 @@ class CVRankerApp(tk.Tk):
         scrollbar.pack(side="right", fill="y")
         self._cv_listbox.pack(fill="both", expand=True)
 
-        list_btns = ttk.Frame(parent)
+        list_btns = ttk.Frame(list_outer)
         list_btns.pack(fill="x", pady=(4, 0))
         ttk.Button(list_btns, text="Remove selected", command=self._remove_cv).pack(side="left", padx=(0, 4))
         ttk.Button(list_btns, text="Clear all", command=self._clear_cvs).pack(side="left")
-
-        ttk.Separator(parent, orient="horizontal").pack(fill="x", pady=6)
 
         self._run_btn = ttk.Button(parent, text="▶  Run Ranking", command=self._run)
         self._run_btn.pack(fill="x", ipady=4)
 
     def _build_right(self, parent):
-        header = ttk.Frame(parent)
-        header.pack(fill="x")
-        ttk.Label(header, text="Ranked Output", font=("", 10, "bold")).pack(side="left")
-        ttk.Button(header, text="Copy", command=self._copy_result).pack(side="right")
-        ttk.Button(header, text="Save…", command=self._save_result).pack(side="right", padx=(0, 4))
+        result_frame = ttk.LabelFrame(parent, text="Ranked Output", padding=6)
+        result_frame.pack(fill="both", expand=True)
+
+        btn_row = ttk.Frame(result_frame)
+        btn_row.pack(fill="x", pady=(0, 4))
+        ttk.Button(btn_row, text="Copy", command=self._copy_result).pack(side="right")
+        ttk.Button(btn_row, text="Save…", command=self._save_result).pack(side="right", padx=(0, 4))
 
         self._result_text = scrolledtext.ScrolledText(
-            parent, wrap="word", font=("Courier", 9),
+            result_frame, wrap="word", font=("Courier", 9),
             state="disabled", bg="#1e1e1e", fg="#d4d4d4",
             insertbackground="white",
         )
-        self._result_text.pack(fill="both", expand=True, pady=(4, 0))
+        self._result_text.pack(fill="both", expand=True)
 
     # ── CV management ──────────────────────────────────────────────────────────
     def _add_cv(self):
@@ -239,6 +256,11 @@ class CVRankerApp(tk.Tk):
         self._cv_listbox.delete(0, "end")
         self._set_status("Ready.")
 
+    def _browse_project_dir(self):
+        path = filedialog.askdirectory(title="Select project directory")
+        if path:
+            self._project_dir_var.set(path)
+
     # ── Run ────────────────────────────────────────────────────────────────────
     def _run(self):
         if self._running:
@@ -247,8 +269,12 @@ class CVRankerApp(tk.Tk):
             messagebox.showwarning("No CVs", "Add at least one CV before running.")
             return
         api_key = self._api_key_var.get().strip()
+        endpoint = self._endpoint_var.get().strip()
         if not api_key:
-            messagebox.showwarning("API Key", "Please enter your OpenAI API key.")
+            messagebox.showwarning("API Key", "Please enter your Azure API key.")
+            return
+        if not endpoint:
+            messagebox.showwarning("Endpoint", "Please enter your Azure OpenAI endpoint.")
             return
         criteria = self._criteria_text.get("1.0", "end").strip()
         if not criteria:
@@ -260,21 +286,28 @@ class CVRankerApp(tk.Tk):
         self._set_result("Running…")
         self._set_status("Ranking in progress…")
 
-        threading.Thread(target=self._rank_thread, args=(api_key, criteria), daemon=True).start()
+        threading.Thread(target=self._rank_thread, args=(api_key, endpoint, criteria), daemon=True).start()
 
-    def _rank_thread(self, api_key: str, criteria: str):
+    def _rank_thread(self, api_key: str, endpoint: str, criteria: str):
         try:
-            llm = make_llm(api_key, self._model_var.get().strip())
+            llm = make_llm(api_key, self._model_var.get().strip(), endpoint)
+            project_dir = self._project_dir_var.get().strip() or ".cv_ranker_project"
 
             project = Project(
-                name="cv_ranking_gui",
+                name="cv_ranking",
                 llm=llm,
-                project_dir=".cv_ranker_tmp",
+                project_dir=project_dir,
             )
             project.set_bundle_schema(input_fields=["cv"])
-            project.set_seed_prompt(
-                f"{criteria}\n\n---\nRANKED CANDIDATES\n(no candidates evaluated yet)"
-            )
+
+            # Only set seed prompt if no previous version exists (fresh start)
+            existing_versions = project.list_versions()
+            if not existing_versions:
+                project.set_seed_prompt(
+                    f"{criteria}\n\n---\nRANKED CANDIDATES\n(no candidates evaluated yet)"
+                )
+            else:
+                self.after(0, self._set_status, f"Resuming from version {len(existing_versions)} — {len(self._cvs)} new CV(s) to process.")
 
             for cv in self._cvs:
                 project.add_example(input=cv["text"])
@@ -300,9 +333,11 @@ class CVRankerApp(tk.Tk):
             )
 
             self.after(0, self._set_result, report.best_prompt)
+            total_versions = len(project.list_versions())
             self.after(0, self._set_status,
-                       f"Done — {len(self._cvs)} CVs ranked, "
-                       f"{report.total_tokens_used:,} total tokens used.")
+                       f"Done — {len(self._cvs)} CVs processed, "
+                       f"{report.total_tokens_used:,} tokens used, "
+                       f"{total_versions} total version(s) saved in {project_dir}.")
 
         except Exception as e:
             self.after(0, self._set_result, f"Error:\n\n{e}")

@@ -18,7 +18,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e . openai python-dotenv pyinstaller
+          pip install -e . openai python-dotenv pyinstaller ttkthemes
 
       - name: Build exe
         run: |
