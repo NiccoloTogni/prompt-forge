@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from dotenv import load_dotenv
+from openai import OpenAI
 
 load_dotenv()
 
@@ -48,7 +49,6 @@ Use this exact format for each entry:
 
 # ── LLM factory ───────────────────────────────────────────────────────────────
 def make_llm(api_key: str, model: str):
-    from openai import OpenAI
     client = OpenAI(api_key=api_key)
 
     def llm(messages: list[LLMMessage]) -> LLMResponse:
