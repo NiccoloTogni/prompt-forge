@@ -275,13 +275,14 @@ class Project:
 
         evaluator = self._resolve_evaluator(eval_strategy)
 
+        _opt_kwargs = dict(optimizer_kwargs or {})
         optimizer = PromptOptimizer(
             llm=self.llm,
-            meta_prompt=self._meta_prompt,
+            meta_prompt=_opt_kwargs.pop("meta_prompt", self._meta_prompt),
             file_loader=self.file_loader,
             context=self._context,
             temperature=config.optimizer_temperature,
-            **(optimizer_kwargs or {}),
+            **_opt_kwargs,
         )
 
         pipeline = TrainingPipeline(
