@@ -163,7 +163,7 @@ result = agent.run(input_file="invoice.pdf")   # PDF passed natively — no text
 ```
 
 > **Note:** The Chat Completions client above does not handle `FilePart` content — use it only
-> with `native_files=False` (the default). Using `native_files=True` with a text-only client
+> with `native_files=False`. Using `native_files=True` (the default) with a text-only client
 > will raise an error from the provider when it receives unexpected content types.
 </details>
 
@@ -336,22 +336,88 @@ report = project.train(
 
 ---
 
-### Prompt consolidation
+### Retry and resilience
 
-After many iterations the optimizer accumulates rules and the prompt grows. Set `max_prompt_chars` to automatically trigger a consolidation step whenever the prompt exceeds that length — redundant and overlapping rules are merged while keeping all distinct coverage:
+All LLM calls (optimizer, evaluator, inference agent) automatically retry on failure with exponential backoff. Configure globally via `TrainingConfig` or per-component:
 
 ```python
 report = project.train(
-    config=TrainingConfig(max_prompt_chars=8_000),
+    config=TrainingConfig(
+        max_retries=5,      # attempts per call (default 3)
+        retry_delay=2.0,    # initial wait in seconds, doubles each attempt (default 1.0)
+    ),
+)
+
+# Or on the inference agent directly
+agent = project.get_inference_agent(max_retries=3, retry_delay=1.0)
+```
+
+---
+
+### Concurrent batch inference
+
+When inputs contain native file parts (PDFs, images), the agent cannot batch them into a single call. Set `max_workers` to process them concurrently instead of sequentially:
+
+```python
+agent = project.get_inference_agent(max_workers=8)
+results = agent.run_bundle_batch(bundles)   # up to 8 concurrent LLM calls
+
+# Or via TrainingConfig for the eval loop
+report = project.train(
+    config=TrainingConfig(max_workers=8),
 )
 ```
+
+Results are always returned in the same order as the input bundles regardless of completion order.
+
+---
+
+### Custom optimizer prompts
+
+The prompts used by the Prompt Engineering Agent and the consolidation step are fully configurable. Inspect the defaults to understand the expected format, then pass overrides:
+
+```python
+from prompt_forge import DEFAULT_OPTIMIZER_PROMPT, DEFAULT_CONSOLIDATION_PROMPT
+
+# Inspect or extend the defaults
+print(DEFAULT_OPTIMIZER_PROMPT)
+
+report = project.train(
+    optimizer_kwargs={
+        "optimizer_prompt": my_custom_optimizer_prompt,
+        "consolidation_prompt": my_custom_consolidation_prompt,
+    },
+)
+```
+
+---
+
+### Prompt consolidation
+
+After many iterations the optimizer accumulates rules and the prompt grows. When you decide it has become unwieldy, call `consolidate()` explicitly to merge redundant and overlapping rules while preserving all distinct coverage:
+
+```python
+# After a training run, compress the latest prompt
+project.consolidate()
+
+# Or consolidate a specific version
+project.consolidate(version=5)
+
+# Then continue training from the consolidated baseline
+report = project.train(train_bundles, val_bundles=val_bundles, config=config)
+```
+
+Consolidation saves the result as a new prompt version with a `[CONSOLIDATION]` entry in the training log, so the history stays complete and auditable. It is never triggered automatically — the decision is always yours.
 
 ---
 
 ### Evaluation strategies
 
 ```python
-# Field-by-field JSON comparison — ideal for data extraction
+# Field-by-field JSON comparison — ideal for data extraction.
+# Includes fuzzy matching: dates are normalised across formats,
+# numbers tolerate minor floating-point differences, and a configurable
+# numeric_tolerance handles rounding variation.
 project.train(eval_strategy="json_fields")
 
 # Token F1 similarity — robust to word order, good for free-text tasks
@@ -566,7 +632,7 @@ training_data/
         expected_output.json
 ```
 
-In text-extraction mode (`native_files=False`, default), all files for a variadic role are concatenated into a single `<role>…</role>` block. With `native_files=True` each file is passed as a separate `FilePart` inside the same XML tags.
+With `native_files=True` (the default) each file is passed as a separate `FilePart` inside the same XML tags. In text-extraction mode (`native_files=False`, requires an explicit `file_loader`), all files for a variadic role are concatenated into a single `<role>…</role>` block.
 
 ---
 

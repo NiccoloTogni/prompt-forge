@@ -316,6 +316,33 @@ class Project:
 
         return pipeline.train(train_bundles, val_bundles=val_bundles, config=config)
 
+    def consolidate(self, version: int | None = None):
+        """
+        Compress the current (or specified) prompt by merging redundant rules.
+
+        Explicit, user-initiated operation — never called automatically during
+        training. Call when the prompt has grown unwieldy, then continue training
+        from the consolidated baseline.
+
+        Args:
+            version: Prompt version to consolidate. Defaults to the latest.
+
+        Returns:
+            The new PromptVersion containing the consolidated prompt.
+        """
+        optimizer = PromptOptimizer(
+            llm=self.llm,
+            consolidation_prompt=self._consolidation_prompt,
+            file_loader=self.file_loader,
+            context=self._context,
+        )
+        pipeline = TrainingPipeline(
+            llm=self.llm,
+            store=self.store,
+            optimizer=optimizer,
+        )
+        return pipeline.consolidate(version=version)
+
     # ── Inference ─────────────────────────────────────────────────────
 
     def get_inference_agent(

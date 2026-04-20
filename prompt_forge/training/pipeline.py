@@ -54,7 +54,6 @@ class TrainingConfig:
     max_total_tokens: int | None = None   # Total token budget for the whole run
     inference_temperature: float | None = DEFAULT_INFERENCE_TEMPERATURE  # None = use model default
     seed: int | None = None               # Random seed for reproducible batch selection
-    max_prompt_chars: int | None = None   # Trigger consolidation when prompt exceeds this length
     native_files: bool = True             # Pass input files natively to the LLM (requires multimodal client)
     max_retries: int = 3                  # Retries per failed LLM call (optimizer + eval agent)
     retry_delay: float = 1.0             # Initial retry wait in seconds (doubles each attempt)
@@ -319,20 +318,6 @@ class TrainingPipeline:
                 no_improvement_count = 0
                 _failed_batch_ids = []
 
-                # Consolidate if prompt has grown too large
-                if (
-                    config.max_prompt_chars is not None
-                    and len(current_prompt) > config.max_prompt_chars
-                ):
-                    logger.info(
-                        f"Prompt length ({len(current_prompt):,} chars) exceeds "
-                        f"max_prompt_chars={config.max_prompt_chars:,}. Consolidating..."
-                    )
-                    consolidation_result = self.optimizer.consolidate(current_prompt)
-                    self._total_tokens += self._count_tokens(consolidation_result.usage)
-                    current_prompt = consolidation_result.new_prompt
-                    logger.info(f"Consolidated to {len(current_prompt):,} chars.")
-
                 # Save new version
                 version = PromptVersion(
                     version=current_version,
@@ -411,6 +396,64 @@ class TrainingPipeline:
             ),
             total_tokens_used=self._total_tokens - _tokens_at_start,
         )
+
+    def consolidate(self, version: int | None = None) -> PromptVersion:
+        """
+        Compress the current (or specified) prompt by merging redundant rules.
+
+        This is an explicit, user-initiated operation — it is never called
+        automatically during training. Call it when you decide the prompt has
+        grown unwieldy, then continue training from the consolidated baseline.
+
+        The consolidated prompt is saved as a new version with a metadata flag
+        so the history stays honest.
+
+        Args:
+            version: Prompt version to consolidate. Defaults to the latest.
+
+        Returns:
+            The new PromptVersion containing the consolidated prompt.
+
+        Raises:
+            ValueError: If no prompt versions exist in the store.
+        """
+        source = (
+            self.store.get_prompt_version(version)
+            if version is not None
+            else self.store.get_latest_prompt()
+        )
+        if source is None:
+            raise ValueError("No prompt versions found. Train at least one iteration first.")
+
+        logger.info(
+            f"Consolidating prompt v{source.version} "
+            f"({len(source.prompt_text):,} chars)..."
+        )
+        result = self.optimizer.consolidate(source.prompt_text)
+        self._total_tokens += self._count_tokens(result.usage)
+
+        latest = self.store.get_latest_prompt()
+        new_version_num = (latest.version if latest else 0) + 1
+
+        consolidated = PromptVersion(
+            version=new_version_num,
+            prompt_text=result.new_prompt,
+            created_at=datetime.now(timezone.utc).isoformat(),
+            parent_version=source.version,
+            training_log_entry=(
+                f"[CONSOLIDATION] Compressed from v{source.version} "
+                f"({len(source.prompt_text):,} → {len(result.new_prompt):,} chars)"
+            ),
+            eval_score=source.eval_score,
+            output_schema=source.output_schema,
+            metadata={"consolidation": True, "source_version": source.version},
+        )
+        self.store.save_prompt_version(consolidated)
+        logger.info(
+            f"Saved consolidated prompt as v{new_version_num} "
+            f"({len(result.new_prompt):,} chars)."
+        )
+        return consolidated
 
     def _evaluate_prompt(
         self,
