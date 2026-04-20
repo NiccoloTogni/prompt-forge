@@ -231,26 +231,6 @@ def test_load_subdir_extension_fallback(tmp_path, simple_schema):
     assert count == 1
 
 
-# ── add_from_directory: flat layout ──────────────────────────────────────────
-
-def test_load_flat_layout(tmp_path, simple_schema):
-    (tmp_path / "001_input.txt").write_text("input 1")
-    (tmp_path / "001_expected_output.txt").write_text("output 1")
-    (tmp_path / "002_input.txt").write_text("input 2")
-    (tmp_path / "002_expected_output.txt").write_text("output 2")
-
-    col = BundleCollection(schema=simple_schema)
-    count = col.add_from_directory(tmp_path)
-    assert count == 2
-    assert {b.bundle_id for b in col.bundles} == {"001", "002"}
-
-
-def test_load_flat_layout_ignores_files_without_underscore(tmp_path, simple_schema):
-    (tmp_path / "readme.txt").write_text("ignore me")
-    col = BundleCollection(schema=simple_schema)
-    count = col.add_from_directory(tmp_path)
-    assert count == 0
-
 
 def test_add_from_directory_not_a_directory_raises(simple_schema, tmp_path):
     f = tmp_path / "file.txt"
@@ -258,5 +238,15 @@ def test_add_from_directory_not_a_directory_raises(simple_schema, tmp_path):
     col = BundleCollection(schema=simple_schema)
     with pytest.raises(ValueError, match="Not a directory"):
         col.add_from_directory(f)
+
+
+def test_add_from_directory_no_subdirs_warns_and_returns_zero(simple_schema, tmp_path, caplog):
+    (tmp_path / "001_input.txt").write_text("stray file")
+    col = BundleCollection(schema=simple_schema)
+    import logging
+    with caplog.at_level(logging.WARNING):
+        count = col.add_from_directory(tmp_path)
+    assert count == 0
+    assert "subdirectories" in caplog.text
 
 

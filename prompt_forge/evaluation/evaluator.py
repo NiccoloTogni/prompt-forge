@@ -17,6 +17,7 @@ import math
 import re
 from abc import ABC, abstractmethod
 from collections import Counter
+from datetime import datetime
 from typing import Any, Callable
 
 from ..llm.client import LLMClient, LLMMessage
@@ -134,12 +135,30 @@ class ExactMatchEvaluator(Evaluator):
         return min(len(a), len(b))
 
 
+# Common date formats tried in order during date normalization.
+_DATE_FORMATS = (
+    "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y",
+    "%d-%m-%Y", "%m-%d-%Y", "%Y/%m/%d",
+    "%d %B %Y", "%B %d, %Y",
+    "%d %b %Y", "%b %d, %Y",
+)
+
+
 class JsonFieldEvaluator(Evaluator):
     """
     Field-by-field JSON comparison.
 
     Ideal for data extraction tasks. Reports which fields match,
     which are wrong, and which are missing.
+
+    Fuzzy matching options (all enabled by default):
+        - ``normalize_dates``: treat date strings that represent the same calendar day
+          as equal, regardless of format (e.g. "2024-01-15" == "15/01/2024").
+        - ``normalize_numbers``: strip thousands separators before comparing numeric
+          strings (e.g. "1,234.56" == "1234.56").
+        - ``numeric_tolerance``: maximum absolute difference for numeric values to be
+          considered equal. Defaults to ``1e-9`` (effectively exact). Set a larger value
+          (e.g. ``0.01``) to allow rounding differences.
     """
 
     def __init__(
@@ -147,10 +166,16 @@ class JsonFieldEvaluator(Evaluator):
         pass_threshold: float = DEFAULT_PASS_THRESHOLD,
         ignore_fields: list[str] | None = None,
         case_sensitive: bool = False,
+        numeric_tolerance: float = 1e-9,
+        normalize_dates: bool = True,
+        normalize_numbers: bool = True,
     ):
         self.pass_threshold = pass_threshold
         self.ignore_fields = set(ignore_fields or [])
         self.case_sensitive = case_sensitive
+        self.numeric_tolerance = numeric_tolerance
+        self.normalize_dates = normalize_dates
+        self.normalize_numbers = normalize_numbers
 
     def evaluate(self, actual: str, expected: str, **kwargs) -> EvalResult:
         try:
@@ -226,19 +251,48 @@ class JsonFieldEvaluator(Evaluator):
     def _compare_values(self, actual: Any, expected: Any) -> bool:
         if actual == expected:
             return True
-        # String comparison with optional case insensitivity
+
         if isinstance(actual, str) and isinstance(expected, str):
-            a = actual.strip()
-            e = expected.strip()
+            a, e = actual.strip(), expected.strip()
             if not self.case_sensitive:
-                a = a.lower()
-                e = e.lower()
-            return a == e
-        # Numeric comparison with tolerance
+                a, e = a.lower(), e.lower()
+            if a == e:
+                return True
+            if self.normalize_dates:
+                da, de = self._parse_date(actual.strip()), self._parse_date(expected.strip())
+                if da is not None and de is not None and da == de:
+                    return True
+            if self.normalize_numbers:
+                na, ne = self._parse_number(actual.strip()), self._parse_number(expected.strip())
+                if na is not None and ne is not None:
+                    return abs(na - ne) <= self.numeric_tolerance
+            return False
+
+        if isinstance(actual, (int, float)) and isinstance(expected, (int, float)):
+            return abs(actual - expected) <= self.numeric_tolerance
+
+        # Cross-type: one is a string, the other is a number
+        na, ne = self._parse_number(str(actual)), self._parse_number(str(expected))
+        if na is not None and ne is not None:
+            return abs(na - ne) <= self.numeric_tolerance
+
+        return str(actual).strip() == str(expected).strip()
+
+    @staticmethod
+    def _parse_date(text: str):
+        for fmt in _DATE_FORMATS:
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def _parse_number(text: str) -> float | None:
         try:
-            return abs(float(actual) - float(expected)) < 1e-6
-        except (TypeError, ValueError):
-            return str(actual).strip() == str(expected).strip()
+            return float(text.replace(",", "").replace(" ", ""))
+        except ValueError:
+            return None
 
 
 class SimilarityEvaluator(Evaluator):

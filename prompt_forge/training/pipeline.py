@@ -23,7 +23,7 @@ from ..file_loaders import FileLoader, get_default_loader
 from ..storage.project_store import ProjectStore, PromptVersion
 from ..evaluation.evaluator import Evaluator, BatchEvalResult
 from ..inference.agent import InferenceAgent
-from .optimizer import PromptOptimizer, OPTIMIZER_TEMPERATURE
+from .optimizer import PromptOptimizer
 from .batch_strategy import BatchStrategy, RandomBatchStrategy
 from .training_log import TrainingLog, LogEntry
 
@@ -52,10 +52,13 @@ class TrainingConfig:
     refinement_threshold: float = DEFAULT_REFINEMENT_THRESHOLD
     max_tokens: int | None = None         # Per-call context window limit for optimizer
     max_total_tokens: int | None = None   # Total token budget for the whole run
-    optimizer_temperature: float = OPTIMIZER_TEMPERATURE  # Temperature for optimizer calls
     inference_temperature: float | None = DEFAULT_INFERENCE_TEMPERATURE  # None = use model default
     seed: int | None = None               # Random seed for reproducible batch selection
     max_prompt_chars: int | None = None   # Trigger consolidation when prompt exceeds this length
+    native_files: bool = True             # Pass input files natively to the LLM (requires multimodal client)
+    max_retries: int = 3                  # Retries per failed LLM call (optimizer + eval agent)
+    retry_delay: float = 1.0             # Initial retry wait in seconds (doubles each attempt)
+    max_workers: int | None = None       # Concurrent LLM calls for per-input batch fallback (None = serial)
 
 
 @dataclasses.dataclass
@@ -206,7 +209,13 @@ class TrainingPipeline:
             file_loader=self.file_loader,
             llm_kwargs=llm_kwargs,
             token_estimator=self.optimizer.token_estimator,
+            native_files=config.native_files,
+            max_retries=config.max_retries,
+            retry_delay=config.retry_delay,
+            max_workers=config.max_workers,
         )
+        self.optimizer.max_retries = config.max_retries
+        self.optimizer.retry_delay = config.retry_delay
         no_improvement_count = 0
         _failed_batch_ids: list[str] = []  # IDs from the last non-improving batch
 

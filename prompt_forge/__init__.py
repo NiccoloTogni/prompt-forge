@@ -24,7 +24,7 @@ from .project import Project
 from .utils import train_val_split
 from .inference.agent import InferenceAgent
 from .bundle import BundleSchema, BundleCollection, ExampleBundle
-from .llm.client import LLMClient, LLMResponse, LLMMessage
+from .llm.client import LLMClient, LLMResponse, LLMMessage, TextPart, FilePart, MessageContent
 from .file_loaders import FileLoader, FileContent, get_default_loader
 from .storage.project_store import (
     FileSystemStore,
@@ -34,6 +34,7 @@ from .storage.project_store import (
 )
 from .training.pipeline import TrainingPipeline, TrainingConfig, TrainingReport, IterationResult
 from .training.optimizer import PromptOptimizer
+from .training.prompt import DEFAULT_OPTIMIZER_PROMPT, DEFAULT_CONSOLIDATION_PROMPT
 from .training.batch_strategy import (
     BatchStrategy,
     RandomBatchStrategy,
@@ -58,6 +59,9 @@ __all__ = [
     "LLMClient",
     "LLMResponse",
     "LLMMessage",
+    "TextPart",
+    "FilePart",
+    "MessageContent",
     # Bundles
     "BundleSchema",
     "BundleCollection",
@@ -77,6 +81,8 @@ __all__ = [
     "TrainingReport",
     "IterationResult",
     "PromptOptimizer",
+    "DEFAULT_OPTIMIZER_PROMPT",
+    "DEFAULT_CONSOLIDATION_PROMPT",
     "BatchStrategy",
     "RandomBatchStrategy",
     "FailurePriorityBatchStrategy",

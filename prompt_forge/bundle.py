@@ -8,6 +8,10 @@ Example schemas:
     - Data extraction: {"input": ".pdf", "expected_output": ".json"}
     - Spec generation: {"input_data": ".csv", "expected_output": ".docx"}
     - Translation:     {"source": ".txt", "expected": ".txt"}
+    - Mail + attachments: {"mail": ".txt", "attachments": ".pdf"} with variadic_roles={"attachments"}
+
+Variadic roles accept zero or more files per bundle (stored as list[Path]).
+They are optional during validation and collected automatically during directory loading.
 """
 
 import dataclasses
@@ -41,23 +45,49 @@ class BundleSchema:
     Args:
         roles: Mapping of role_name → file extension (e.g., {"input": ".pdf", "expected_output": ".json"})
         role_descriptions: Optional human-readable descriptions for each role.
+        variadic_roles: Set of role names that accept zero or more files instead of exactly one.
+            Variadic roles are optional in bundles (absence is valid) and their files are
+            collected as a list. Example: variadic_roles={"attachments"}.
     """
 
     roles: dict[str, str]  # role_name → expected extension
     role_descriptions: dict[str, str] = dataclasses.field(default_factory=dict)
+    variadic_roles: set[str] = dataclasses.field(default_factory=set)
 
     def validate_bundle(self, bundle: ExampleBundle) -> list[str]:
         """Return list of validation errors (empty = valid)."""
         errors = []
-        for role in self.roles:
-            if role not in bundle.files:
-                errors.append(f"Missing required role: '{role}'")
+        for role, expected_ext in self.roles.items():
+            if role in self.variadic_roles:
+                raw = bundle.files.get(role)
+                if raw is None:
+                    continue  # variadic role absent — OK
+                file_list: list = raw if isinstance(raw, list) else [raw]
+                for p in file_list:
+                    actual_ext = Path(p).suffix.lower()
+                    if actual_ext != expected_ext.lower():
+                        errors.append(
+                            f"Role '{role}': '{Path(p).name}' has extension "
+                            f"'{actual_ext}', expected '{expected_ext}'"
+                        )
+            else:
+                if role not in bundle.files:
+                    errors.append(f"Missing required role: '{role}'")
+                else:
+                    p = bundle.files[role]
+                    actual_ext = Path(p).suffix.lower()
+                    if actual_ext != expected_ext.lower():
+                        errors.append(
+                            f"Role '{role}': '{Path(p).name}' has extension "
+                            f"'{actual_ext}', expected '{expected_ext}'"
+                        )
         return errors
 
     def to_dict(self) -> dict:
         return {
             "roles": self.roles,
             "role_descriptions": self.role_descriptions,
+            "variadic_roles": sorted(self.variadic_roles),
         }
 
     @classmethod
@@ -65,6 +95,7 @@ class BundleSchema:
         return cls(
             roles=data["roles"],
             role_descriptions=data.get("role_descriptions", {}),
+            variadic_roles=set(data.get("variadic_roles", [])),
         )
 
 
@@ -75,40 +106,64 @@ class ExampleBundle:
 
     Attributes:
         bundle_id: Unique identifier for this bundle.
-        files: Mapping of role_name → file path.
+        files: Mapping of role_name → file path (or list of paths for variadic roles).
         metadata: Optional extra info about this example.
     """
 
     bundle_id: str
-    files: dict[str, Path]  # role_name → file path
+    files: dict[str, Path | list[Path]]  # role_name → file path (or list for variadic roles)
     metadata: dict[str, Any] = dataclasses.field(default_factory=dict)
 
     def load_contents(self, loader: FileLoader | None = None) -> dict[str, FileContent]:
         """
         Load all files in the bundle using the given FileLoader.
 
+        For variadic roles (list[Path]), all files are loaded and their text is
+        concatenated with ``\\n\\n`` separators into a single FileContent.
+
         Returns:
             Mapping of role_name → FileContent.
         """
         if loader is None:
             loader = get_default_loader()
-        contents = {}
+        contents: dict[str, FileContent] = {}
         for role, path in self.files.items():
-            contents[role] = loader.load(path)
+            if isinstance(path, list):
+                if not path:
+                    contents[role] = FileContent(
+                        text="", source_path="", file_type="", metadata={"file_count": 0}
+                    )
+                else:
+                    loaded = [loader.load(p) for p in path]
+                    combined = "\n\n".join(fc.text for fc in loaded)
+                    contents[role] = FileContent(
+                        text=combined,
+                        source_path=str(path[0]),
+                        file_type=path[0].suffix,
+                        metadata={"file_count": len(path), "source_paths": [str(p) for p in path]},
+                    )
+            else:
+                contents[role] = loader.load(path)
         return contents
 
     def to_dict(self) -> dict:
+        def _serialise(v: Path | list[Path]) -> str | list[str]:
+            return [str(p) for p in v] if isinstance(v, list) else str(v)
+
         return {
             "bundle_id": self.bundle_id,
-            "files": {role: str(path) for role, path in self.files.items()},
+            "files": {role: _serialise(path) for role, path in self.files.items()},
             "metadata": self.metadata,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> ExampleBundle:
+        def _deserialise(v: str | list) -> Path | list[Path]:
+            return [Path(p) for p in v] if isinstance(v, list) else Path(v)
+
         return cls(
             bundle_id=data["bundle_id"],
-            files={role: Path(p) for role, p in data["files"].items()},
+            files={role: _deserialise(v) for role, v in data["files"].items()},
             metadata=data.get("metadata", {}),
         )
 
@@ -151,9 +206,8 @@ class BundleCollection:
         """
         Auto-discover bundles from a directory structure.
 
-        Expects one of two layouts:
+        Expects one subdirectory per bundle:
 
-        1. (Default) Subdirectory layout (one subdirectory per bundle):
             directory/
                 example_001/
                     input.pdf
@@ -162,12 +216,9 @@ class BundleCollection:
                     input.pdf
                     expected_output.json
 
-        2. Flat layout with naming convention:
-            directory/
-                001_input.pdf
-                001_expected_output.json
-                002_input.pdf
-                002_expected_output.json
+        Files inside each subdirectory are matched to schema roles by name:
+        a file named ``{role}.ext`` or ``{role}_*.ext`` is assigned to that role.
+        For variadic roles all matching files are collected as a list.
 
         Returns the number of bundles loaded.
         """
@@ -175,32 +226,31 @@ class BundleCollection:
         if not directory.is_dir():
             raise ValueError(f"Not a directory: {directory}")
 
-        loaded = 0
-
-        # Try subdirectory layout first
         subdirs = [d for d in sorted(directory.iterdir()) if d.is_dir()]
-        if subdirs:
-            logger.info(f"Loading bundles from subdirectories in {directory}...")
-            loaded = self._load_subdir_layout(subdirs)
-        else:
-            logger.info(f"Loading bundles from flat layout in {directory}...")
-            loaded = self._load_flat_layout(directory)
+        if not subdirs:
+            logger.warning(
+                f"No subdirectories found in {directory}. "
+                "add_from_directory expects one subdirectory per bundle."
+            )
+            return 0
 
-        return loaded
+        logger.info(f"Loading bundles from subdirectories in {directory}...")
+        return self._load_subdir_layout(subdirs)
 
     def _load_subdir_layout(self, subdirs: list[Path]) -> int:
         """Each subdirectory is one bundle. Files are matched by role name in filename."""
         loaded = 0
         for subdir in subdirs:
-            files = {}
+            files: dict[str, Path | list[Path]] = {}
             for role, ext in self.schema.roles.items():
-                # Look for files matching: role_name.ext or role_name*.ext
                 candidates = list(subdir.glob(f"{role}.*")) + list(subdir.glob(f"{role}_*.*"))
-                # Also try: any file with the right extension if there's only one role with that ext
                 if not candidates:
                     candidates = [f for f in subdir.iterdir() if f.suffix.lower() == ext.lower()]
 
-                if candidates:
+                if role in self.schema.variadic_roles:
+                    if candidates:
+                        files[role] = sorted(candidates)
+                elif candidates:
                     files[role] = candidates[0]
 
             if files:
@@ -213,46 +263,6 @@ class BundleCollection:
                 if not errors:
                     self._bundles[bundle.bundle_id] = bundle
                     loaded += 1
-
-        return loaded
-
-    def _load_flat_layout(self, directory: Path) -> int:
-        """
-        Flat directory with prefix-based grouping.
-        Files like: 001_input.pdf, 001_expected_output.json
-        The prefix before the first underscore groups files into bundles.
-        """
-        loaded = 0
-        groups: dict[str, dict[str, Path]] = {}
-
-        for file_path in sorted(directory.iterdir()):
-            if file_path.is_dir() or file_path.name.startswith("."):
-                continue
-            # Extract prefix (bundle id) and role from filename
-            name = file_path.stem
-            parts = name.split("_", 1)
-            if len(parts) < 2:
-                continue
-            prefix, role_part = parts[0], parts[1]
-
-            # Match role_part against schema roles
-            for role in self.schema.roles:
-                if role_part.lower().startswith(role.lower()):
-                    if prefix not in groups:
-                        groups[prefix] = {}
-                    groups[prefix][role] = file_path
-                    break
-
-        for prefix, files in groups.items():
-            bundle = ExampleBundle(
-                bundle_id=prefix,
-                files=files,
-                metadata={"source_dir": str(directory)},
-            )
-            errors = self.schema.validate_bundle(bundle)
-            if not errors:
-                self._bundles[bundle.bundle_id] = bundle
-                loaded += 1
 
         return loaded
 

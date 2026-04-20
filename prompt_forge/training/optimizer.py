@@ -19,7 +19,8 @@ import logging
 import re
 from typing import Callable
 
-from .prompt import DEFAULT_META_PROMPT, CONSOLIDATION_META_PROMPT
+from .prompt import DEFAULT_OPTIMIZER_PROMPT, DEFAULT_CONSOLIDATION_PROMPT
+from .._retry import call_with_retry
 from ..llm.client import LLMClient, LLMMessage
 from ..file_loaders import FileLoader, get_default_loader
 from ..bundle import ExampleBundle, is_output_role
@@ -44,30 +45,41 @@ class PromptOptimizer:
     def __init__(
         self,
         llm: LLMClient,
-        meta_prompt: str | None = None,
+        optimizer_prompt: str | None = None,
+        consolidation_prompt: str | None = None,
         file_loader: FileLoader | None = None,
         context: str = "",
         temperature: float = OPTIMIZER_TEMPERATURE,
         token_estimator: Callable[[str], int] | None = None,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
     ):
         """
         Args:
             llm: The LLM client to use for optimization.
-            meta_prompt: Custom meta-prompt for the optimizer. If None, uses default.
+            optimizer_prompt: System prompt for the optimizer. Defaults to
+                              DEFAULT_OPTIMIZER_PROMPT. Inspect that constant to
+                              understand the format and build custom variants.
+            consolidation_prompt: System prompt used during prompt consolidation.
+                                  Defaults to DEFAULT_CONSOLIDATION_PROMPT.
             file_loader: FileLoader for reading example files.
             context: Additional context about the task/domain.
             temperature: Sampling temperature for the optimizer LLM call.
-                         See OPTIMIZER_TEMPERATURE for the default value.
             token_estimator: Callable that estimates token count for a string.
                              Defaults to len(text) // TOKEN_CHARS_PER_TOKEN.
-                             Provide a model-specific tokenizer for precise limits.
+            max_retries: Number of times to retry a failed LLM call (default 3).
+            retry_delay: Initial wait in seconds before the first retry; doubles
+                         each subsequent attempt (exponential backoff).
         """
         self.llm = llm
-        self.meta_prompt = meta_prompt or DEFAULT_META_PROMPT
+        self.optimizer_prompt = optimizer_prompt or DEFAULT_OPTIMIZER_PROMPT
+        self.consolidation_prompt = consolidation_prompt or DEFAULT_CONSOLIDATION_PROMPT
         self.file_loader = file_loader or get_default_loader()
         self.context = context
         self.temperature = temperature
         self.token_estimator = token_estimator or (lambda text: len(text) // TOKEN_CHARS_PER_TOKEN)
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
         self._detected_schema: dict | None = None  # cached after first successful detection
 
     def optimize(
@@ -129,12 +141,16 @@ class PromptOptimizer:
         )
 
         messages = [
-            LLMMessage(role="system", content=self.meta_prompt),
+            LLMMessage(role="system", content=self.optimizer_prompt),
             LLMMessage(role="user", content=user_content),
         ]
 
         logger.info(f"Optimizing prompt with {len(examples)} examples...")
-        response = self.llm.complete(messages, temperature=self.temperature)
+        response = call_with_retry(
+            lambda: self.llm.complete(messages, temperature=self.temperature),
+            max_retries=self.max_retries,
+            delay=self.retry_delay,
+        )
 
         new_prompt, learnings, issues = self._parse_structured_response(
             response.text, current_prompt
@@ -175,7 +191,7 @@ class PromptOptimizer:
             # Model didn't follow the format — treat the whole response as the prompt
             logger.warning(
                 "Optimizer response missing <optimized_prompt> tag. "
-                "Using full response as prompt. Consider reviewing your meta_prompt."
+                "Using full response as prompt. Consider reviewing your optimizer_prompt."
             )
             new_prompt = text.strip() or fallback_prompt
 
@@ -241,7 +257,7 @@ class PromptOptimizer:
         overhead_text = "\n\n".join(overhead_parts)
 
         fixed_tokens = (
-            self._estimate_tokens(self.meta_prompt)
+            self._estimate_tokens(self.optimizer_prompt)
             + self._estimate_tokens(overhead_text)
         )
         remaining_budget = max_tokens - fixed_tokens
@@ -387,10 +403,14 @@ class PromptOptimizer:
             OptimizerResult with the consolidated prompt (learnings/issues are empty).
         """
         messages = [
-            LLMMessage(role="system", content=CONSOLIDATION_META_PROMPT),
+            LLMMessage(role="system", content=self.consolidation_prompt),
             LLMMessage(role="user", content=prompt),
         ]
-        response = self.llm.complete(messages, temperature=0.2)
+        response = call_with_retry(
+            lambda: self.llm.complete(messages, temperature=0.2),
+            max_retries=self.max_retries,
+            delay=self.retry_delay,
+        )
         consolidated = response.text.strip()
         if not consolidated:
             logger.warning("Consolidation returned empty response — keeping original prompt.")

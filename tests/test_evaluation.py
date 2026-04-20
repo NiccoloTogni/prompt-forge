@@ -226,6 +226,71 @@ class TestJsonFieldEvaluator:
         r = ev.evaluate({"a": "1"}, {"a": "1"})
         assert r.score == 1.0
 
+    # ── Fuzzy matching ────────────────────────────────────────────────────────
+
+    def test_date_normalization_iso_vs_slash(self):
+        ev = JsonFieldEvaluator()
+        actual = json.dumps({"date": "2024-01-15"})
+        expected = json.dumps({"date": "15/01/2024"})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 1.0
+
+    def test_date_normalization_iso_vs_us_slash(self):
+        ev = JsonFieldEvaluator()
+        actual = json.dumps({"date": "2024-03-25"})
+        expected = json.dumps({"date": "03/25/2024"})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 1.0
+
+    def test_date_normalization_disabled(self):
+        ev = JsonFieldEvaluator(normalize_dates=False)
+        actual = json.dumps({"date": "2024-01-15"})
+        expected = json.dumps({"date": "15/01/2024"})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 0.0
+
+    def test_different_dates_do_not_match(self):
+        ev = JsonFieldEvaluator()
+        actual = json.dumps({"date": "2024-01-15"})
+        expected = json.dumps({"date": "2024-01-16"})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 0.0
+
+    def test_number_string_normalization_thousands_sep(self):
+        ev = JsonFieldEvaluator()
+        actual = json.dumps({"price": "1234.56"})
+        expected = json.dumps({"price": "1,234.56"})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 1.0
+
+    def test_number_string_normalization_disabled(self):
+        ev = JsonFieldEvaluator(normalize_numbers=False)
+        actual = json.dumps({"price": "1234.56"})
+        expected = json.dumps({"price": "1,234.56"})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 0.0
+
+    def test_numeric_tolerance_within(self):
+        ev = JsonFieldEvaluator(numeric_tolerance=0.01)
+        actual = json.dumps({"price": 99.995})
+        expected = json.dumps({"price": 100.0})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 1.0
+
+    def test_numeric_tolerance_exceeded(self):
+        ev = JsonFieldEvaluator(numeric_tolerance=0.001)
+        actual = json.dumps({"price": 99.995})
+        expected = json.dumps({"price": 100.0})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 0.0
+
+    def test_cross_type_number_string_vs_float(self):
+        ev = JsonFieldEvaluator()
+        actual = json.dumps({"amount": "1234"})
+        expected = json.dumps({"amount": 1234})
+        r = ev.evaluate(actual, expected)
+        assert r.score == 1.0
+
 
 # ── SimilarityEvaluator ───────────────────────────────────────────────────────
 

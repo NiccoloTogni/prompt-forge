@@ -70,7 +70,8 @@ class Project:
         self._bundles: BundleCollection | None = None
         self._context: str = ""
         self._seed_prompt: str | None = None
-        self._meta_prompt: str | None = None
+        self._optimizer_prompt: str | None = None
+        self._consolidation_prompt: str | None = None
         self._output_schema: dict | None = None
 
         # Try to load existing config
@@ -82,6 +83,7 @@ class Project:
         self,
         roles: dict[str, str] | None = None,
         role_descriptions: dict[str, str] | None = None,
+        variadic: list[str] | None = None,
         **kwargs: str,
     ) -> None:
         """
@@ -90,10 +92,15 @@ class Project:
         Can be called with a dict or with keyword arguments:
             project.set_bundle_schema(input=".pdf", expected_output=".json")
             project.set_bundle_schema(roles={"input": ".pdf", "expected_output": ".json"})
+            project.set_bundle_schema(mail=".txt", attachments=".pdf", expected_output=".json",
+                                      variadic=["attachments"])
 
         Args:
             roles: Dict of role_name → file_extension.
             role_descriptions: Optional descriptions for each role.
+            variadic: List of role names that accept 0..N files instead of exactly one.
+                      Variadic roles are optional in each bundle and their files are
+                      collected as a list. Directory loading collects all matching files.
             **kwargs: Alternative to roles dict (role_name=extension).
         """
         if roles is None:
@@ -104,6 +111,7 @@ class Project:
         self._schema = BundleSchema(
             roles=roles,
             role_descriptions=role_descriptions or {},
+            variadic_roles=set(variadic) if variadic else set(),
         )
         self._bundles = BundleCollection(schema=self._schema, loader=self.file_loader)
         self._save_config()
@@ -188,14 +196,23 @@ class Project:
         self._context = context
         self._save_config()
 
-    def set_meta_prompt(self, meta_prompt: str) -> None:
+    def set_optimizer_prompt(self, prompt: str) -> None:
         """
-        Override the default meta-prompt used by the Prompt Engineering Agent.
+        Override the system prompt used by the Prompt Engineering Agent.
 
-        Only needed for advanced customization. The default works well for
-        most use cases.
+        Inspect ``DEFAULT_OPTIMIZER_PROMPT`` to understand the expected format
+        and build custom variants on top of it.
         """
-        self._meta_prompt = meta_prompt
+        self._optimizer_prompt = prompt
+        self._save_config()
+
+    def set_consolidation_prompt(self, prompt: str) -> None:
+        """
+        Override the prompt used when consolidating a grown system prompt.
+
+        Inspect ``DEFAULT_CONSOLIDATION_PROMPT`` to understand the expected format.
+        """
+        self._consolidation_prompt = prompt
         self._save_config()
 
     def set_output_schema(self, schema: dict) -> None:
@@ -278,10 +295,10 @@ class Project:
         _opt_kwargs = dict(optimizer_kwargs or {})
         optimizer = PromptOptimizer(
             llm=self.llm,
-            meta_prompt=_opt_kwargs.pop("meta_prompt", self._meta_prompt),
+            optimizer_prompt=_opt_kwargs.pop("optimizer_prompt", self._optimizer_prompt),
+            consolidation_prompt=_opt_kwargs.pop("consolidation_prompt", self._consolidation_prompt),
             file_loader=self.file_loader,
             context=self._context,
-            temperature=config.optimizer_temperature,
             **_opt_kwargs,
         )
 
@@ -382,7 +399,8 @@ class Project:
             "name": self.name,
             "context": self._context,
             "seed_prompt": self._seed_prompt,
-            "meta_prompt": self._meta_prompt,
+            "optimizer_prompt": self._optimizer_prompt,
+            "consolidation_prompt": self._consolidation_prompt,
             "output_schema": self._output_schema,
             "schema": self._schema.to_dict() if self._schema else None,
             "bundles": self._bundles.to_dict() if self._bundles else None,
@@ -396,7 +414,8 @@ class Project:
             return
         self._context = config.get("context", "")
         self._seed_prompt = config.get("seed_prompt")
-        self._meta_prompt = config.get("meta_prompt")
+        self._optimizer_prompt = config.get("optimizer_prompt")
+        self._consolidation_prompt = config.get("consolidation_prompt")
         self._output_schema = config.get("output_schema")
         if config.get("schema"):
             self._schema = BundleSchema.from_dict(config["schema"])

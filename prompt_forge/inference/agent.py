@@ -12,17 +12,45 @@ Batch inference:
 import json
 import logging
 import re
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
-from ..llm.client import LLMClient, LLMMessage
+from ..llm.client import LLMClient, LLMMessage, LLMResponse, MessageContent, TextPart, FilePart
 from ..file_loaders import FileLoader, get_default_loader
 from ..storage.project_store import ProjectStore, FileSystemStore
 from ..bundle import ExampleBundle, is_output_role
+from .._retry import call_with_retry
 
 logger = logging.getLogger(__name__)
 
 TOKEN_CHARS_PER_TOKEN = 4
+
+# MIME type map used when building FilePart objects
+_MEDIA_TYPES: dict[str, str] = {
+    ".pdf":  "application/pdf",
+    ".png":  "image/png",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif":  "image/gif",
+    ".webp": "image/webp",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".csv":  "text/csv",
+    ".txt":  "text/plain",
+    ".md":   "text/markdown",
+    ".json": "application/json",
+}
+
+
+def _infer_media_type(path: Path) -> str | None:
+    return _MEDIA_TYPES.get(path.suffix.lower())
+
+
+def _has_file_parts(content: MessageContent) -> bool:
+    return isinstance(content, list) and any(isinstance(p, FilePart) for p in content)
 
 
 class InferenceAgent:
@@ -45,17 +73,35 @@ class InferenceAgent:
         llm_kwargs: dict[str, Any] | None = None,
         output_schema: dict | None = None,
         token_estimator: Callable[[str], int] | None = None,
+        native_files: bool = True,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        max_workers: int | None = None,
     ):
         """
         Args:
             llm: LLM client to use.
             prompt_text: The system prompt (usually from a trained version).
-            file_loader: FileLoader for reading input files.
+            file_loader: FileLoader for reading input files (used when native_files=False).
             system_suffix: Additional text appended to the system prompt.
             llm_kwargs: Additional kwargs for llm.complete() (e.g. temperature).
             output_schema: If set, outputs are parsed as JSON dicts.
             token_estimator: Callable for estimating token counts (used for chunking).
                              Defaults to len(text) // TOKEN_CHARS_PER_TOKEN.
+            native_files: When True (default), input files are passed directly to the
+                          LLM as FilePart content parts. When False AND an explicit
+                          file_loader is provided, files are extracted to text instead.
+                          If False but no file_loader is given, native mode is used
+                          regardless. Requires an LLM client that handles FilePart
+                          (e.g. Azure OpenAI Responses API). Batch inference
+                          automatically falls back to sequential calls when file parts
+                          are present.
+            max_retries: Number of times to retry a failed LLM call (default 3).
+            retry_delay: Initial wait in seconds before the first retry; doubles
+                         each subsequent attempt (exponential backoff).
+            max_workers: Maximum number of concurrent LLM calls when the batch
+                         falls back to per-input calls (i.e. when file parts are
+                         present). None (default) keeps the serial behaviour.
         """
         self.llm = llm
         self.prompt_text = prompt_text
@@ -64,7 +110,14 @@ class InferenceAgent:
         self.llm_kwargs = llm_kwargs or {}
         self.output_schema = output_schema
         self.token_estimator = token_estimator or (lambda text: len(text) // TOKEN_CHARS_PER_TOKEN)
-        self.tokens_used: int = 0  # cumulative input + output tokens across all calls
+        # Text extraction requires both an explicit opt-out AND an explicit loader.
+        # Without a loader, fall back to native regardless of the flag.
+        self.native_files = native_files or (file_loader is None)
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self.max_workers = max_workers
+        self.tokens_used: int = 0
+        self._tokens_lock = threading.Lock()  # guards tokens_used under concurrent calls
 
     # ── Class methods ─────────────────────────────────────────────────────────
 
@@ -198,19 +251,46 @@ class InferenceAgent:
 
     # ── Internal: batch call ──────────────────────────────────────────────────
 
-    def _batch_call(self, user_contents: list[str], max_tokens: int | None) -> list:
-        """Single-call (or chunked) batch over pre-built user content strings.
+    def _batch_call(self, user_contents: list[MessageContent], max_tokens: int | None) -> list:
+        """Single-call (or chunked) batch over pre-built user content.
+
+        Falls back to sequential calls when any content contains FilePart objects,
+        since native file inputs cannot be wrapped in the XML batch format.
 
         Returns list[str] when output_schema is None, list[dict] when output_schema is set.
         """
         if not user_contents:
             return []
-        if len(user_contents) == 1:
-            response = self._call_single(self._build_system(), user_contents[0])
+
+        # Native file content: can't XML-wrap binary parts — run per-input, optionally concurrent
+        if any(_has_file_parts(c) for c in user_contents):
+            logger.info(
+                "Batch inference: %d inputs contain native file parts — running %s",
+                len(user_contents),
+                f"concurrently (max_workers={self.max_workers})" if self.max_workers else "sequentially",
+            )
+            if self.max_workers:
+                return self._concurrent_call(user_contents)
+            return [self._post_process(self._call_single(self._build_system(), c).text)
+                    for c in user_contents]
+
+        # All-text path — use existing batch / chunked logic.
+        # Safe cast: file-part content already handled above; remaining items are str.
+        from typing import cast
+        text_contents = cast(list[str], user_contents)
+        if len(text_contents) == 1:
+            response = self._call_single(self._build_system(), text_contents[0])
             return [self._post_process(response.text)]
         if max_tokens is not None:
-            return self._chunked_batch(user_contents, max_tokens)
-        return self._single_batch_call(user_contents)
+            return self._chunked_batch(text_contents, max_tokens)
+        return self._single_batch_call(text_contents)
+
+    def _concurrent_call(self, user_contents: list[MessageContent]) -> list:
+        """Fire one LLM call per input concurrently, preserving input order."""
+        system = self._build_system()
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = [executor.submit(self._call_single, system, c) for c in user_contents]
+            return [self._post_process(f.result().text) for f in futures]
 
     def _single_batch_call(self, user_contents: list[str]) -> list:
         """Send all inputs in one LLM call; parse a JSON array response.
@@ -312,17 +392,22 @@ class InferenceAgent:
 
     # ── Internal: helpers ─────────────────────────────────────────────────────
 
-    def _call_single(self, system: str, user_content: str):
-        """Make a single LLM call and accumulate token usage."""
+    def _call_single(self, system: str, user_content: MessageContent) -> LLMResponse:
+        """Make a single LLM call (with retry) and accumulate token usage."""
         messages = [
             LLMMessage(role="system", content=system),
             LLMMessage(role="user", content=user_content),
         ]
-        response = self.llm.complete(messages, **self.llm_kwargs)
+        response = call_with_retry(
+            lambda: self.llm.complete(messages, **self.llm_kwargs),
+            max_retries=self.max_retries,
+            delay=self.retry_delay,
+        )
         if response.usage:
-            self.tokens_used += (
-                response.usage.get("input_tokens", 0) + response.usage.get("output_tokens", 0)
-            )
+            with self._tokens_lock:
+                self.tokens_used += (
+                    response.usage.get("input_tokens", 0) + response.usage.get("output_tokens", 0)
+                )
         return response
 
     def _build_system(self) -> str:
@@ -331,13 +416,28 @@ class InferenceAgent:
             system += "\n\n" + self.system_suffix
         return system
 
-    def _bundle_to_user_content(self, bundle: ExampleBundle) -> str:
-        contents = bundle.load_contents(self.file_loader)
-        return "\n\n".join(
-            f"<{role}>\n{content.text}\n</{role}>"
-            for role, content in contents.items()
-            if not is_output_role(role)
-        )
+    def _bundle_to_user_content(self, bundle: ExampleBundle) -> MessageContent:
+        if not self.native_files:
+            contents = bundle.load_contents(self.file_loader)
+            return "\n\n".join(
+                f"<{role}>\n{content.text}\n</{role}>"
+                for role, content in contents.items()
+                if not is_output_role(role)
+            )
+        parts: list[TextPart | FilePart] = []
+        for role, raw_path in bundle.files.items():
+            if is_output_role(role):
+                continue
+            parts.append(TextPart(text=f"<{role}>"))
+            if isinstance(raw_path, list):
+                for rp in raw_path:
+                    p = Path(rp)
+                    parts.append(FilePart(path=p, media_type=_infer_media_type(p)))
+            else:
+                p = Path(raw_path)  # normalise: may be str or Path
+                parts.append(FilePart(path=p, media_type=_infer_media_type(p)))
+            parts.append(TextPart(text=f"</{role}>"))
+        return parts
 
     def _post_process(self, text: str) -> "str | dict":
         """Parse JSON if output_schema is set; otherwise strip code fences."""
@@ -351,22 +451,42 @@ class InferenceAgent:
         input_file: str | Path | None = None,
         input_files: dict[str, str | Path] | None = None,
         extra_context: str = "",
-    ) -> str:
-        parts = []
+    ) -> MessageContent:
+        if not self.native_files:
+            # Text-extraction path (original behaviour)
+            parts: list[str] = []
+            if extra_context:
+                parts.append(f"<additional_context>\n{extra_context}\n</additional_context>")
+            if input_text is not None:
+                parts.append(input_text)
+            elif input_file:
+                content = self.file_loader.load(input_file)
+                parts.append(f"<input>\n{content.text}\n</input>")
+            elif input_files:
+                for role, path in input_files.items():
+                    content = self.file_loader.load(path)
+                    parts.append(f"<{role}>\n{content.text}\n</{role}>")
+            else:
+                raise ValueError("Provide one of: input_text, input_file, or input_files")
+            return "\n\n".join(parts)
+
+        # Native-file path — pass files directly as content parts
+        multimodal: list[TextPart | FilePart] = []
         if extra_context:
-            parts.append(f"<additional_context>\n{extra_context}\n</additional_context>")
+            multimodal.append(TextPart(text=f"<additional_context>\n{extra_context}\n</additional_context>"))
         if input_text is not None:
-            parts.append(input_text)
+            multimodal.append(TextPart(text=input_text))
         elif input_file:
-            content = self.file_loader.load(input_file)
-            parts.append(f"<input>\n{content.text}\n</input>")
+            p = Path(input_file)
+            multimodal.append(FilePart(path=p, media_type=_infer_media_type(p)))
         elif input_files:
             for role, path in input_files.items():
-                content = self.file_loader.load(path)
-                parts.append(f"<{role}>\n{content.text}\n</{role}>")
+                p = Path(path)
+                multimodal.append(TextPart(text=f"<{role}>"))
+                multimodal.append(FilePart(path=p, media_type=_infer_media_type(p)))
         else:
             raise ValueError("Provide one of: input_text, input_file, or input_files")
-        return "\n\n".join(parts)
+        return multimodal
 
     @staticmethod
     def _strip_code_fences(text: str) -> str:

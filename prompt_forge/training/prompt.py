@@ -1,4 +1,4 @@
-CONSOLIDATION_META_PROMPT = """\
+DEFAULT_CONSOLIDATION_PROMPT = """\
 You are an expert Prompt Engineer. The system prompt below has grown large over many training
 iterations and may contain redundant, overlapping, or poorly organized rules.
 
@@ -11,7 +11,7 @@ Your job is to consolidate it into a clean, well-structured version that:
 Return ONLY the consolidated prompt text, nothing else.
 Do not add any preamble, explanation, or markdown fences."""
 
-DEFAULT_META_PROMPT = """\
+DEFAULT_OPTIMIZER_PROMPT = """\
 You are an expert Prompt Engineer. Your job is to analyze examples of a task
 and produce the best possible system prompt that will enable an AI agent to
 perform this task accurately and consistently.

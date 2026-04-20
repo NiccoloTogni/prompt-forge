@@ -67,7 +67,7 @@ class MyLLM:
 ```
 
 <details>
-<summary>Example: OpenAI / Azure OpenAI</summary>
+<summary>Example: Azure OpenAI Chat Completions (text only)</summary>
 
 ```python
 from openai import AzureOpenAI
@@ -99,6 +99,72 @@ llm = AzureClient(
     api_key="your-key",
 )
 ```
+</details>
+
+<details>
+<summary>Example: Azure OpenAI Responses API (native file support)</summary>
+
+Use this when you want to pass PDFs, images, and other files directly to the model
+without text extraction. Requires `native_files=True` on the inference agent and a
+model that supports the Responses API (api-version `2025-03-01-preview` or later).
+
+```python
+import base64
+from openai import AzureOpenAI
+from prompt_forge import LLMMessage, LLMResponse, TextPart, FilePart
+
+class AzureResponsesClient:
+    def __init__(self, deployment: str, **kwargs):
+        self.client = AzureOpenAI(**kwargs)
+        self.deployment = deployment
+
+    def complete(self, messages: list[LLMMessage], **kwargs) -> LLMResponse:
+        input_ = []
+        for m in messages:
+            if isinstance(m.content, str):
+                input_.append({"role": m.role, "content": m.content})
+            else:
+                parts = []
+                for part in m.content:
+                    if isinstance(part, TextPart):
+                        parts.append({"type": "input_text", "text": part.text})
+                    elif isinstance(part, FilePart):
+                        if part.file_id:
+                            parts.append({"type": "input_file", "file_id": part.file_id})
+                        else:
+                            data = base64.b64encode(part.path.read_bytes()).decode()
+                            mime = part.media_type or "application/octet-stream"
+                            parts.append({
+                                "type": "input_file",
+                                "filename": part.path.name,
+                                "file_data": f"data:{mime};base64,{data}",
+                            })
+                input_.append({"role": m.role, "content": parts})
+
+        resp = self.client.responses.create(model=self.deployment, input=input_, **kwargs)
+        return LLMResponse(
+            text=resp.output_text,
+            usage={
+                "input_tokens": resp.usage.input_tokens,
+                "output_tokens": resp.usage.output_tokens,
+            },
+        )
+
+llm = AzureResponsesClient(
+    deployment="gpt-4o",
+    azure_endpoint="https://your-resource.openai.azure.com/",
+    api_version="2025-03-01-preview",
+    api_key="your-key",
+)
+
+# Enable native file passing at inference time
+agent = project.get_inference_agent(native_files=True)
+result = agent.run(input_file="invoice.pdf")   # PDF passed natively — no text extraction
+```
+
+> **Note:** The Chat Completions client above does not handle `FilePart` content — use it only
+> with `native_files=False` (the default). Using `native_files=True` with a text-only client
+> will raise an error from the provider when it receives unexpected content types.
 </details>
 
 ---
@@ -468,6 +534,39 @@ project.train(
     inference_fn=my_inference,
 )
 ```
+
+---
+
+### Variable-length file bundles (variadic roles)
+
+Some tasks have a fixed "main" file plus a variable number of attachments — e.g. an e-mail with N PDF attachments, or a product sheet with N reference images. Mark those roles as `variadic`:
+
+```python
+project.set_bundle_schema(
+    mail=".txt",
+    attachments=".pdf",
+    expected_output=".json",
+    variadic=["attachments"],   # 0..N files allowed for this role
+)
+```
+
+Directory layout — all files whose name starts with the role are collected:
+
+```
+training_data/
+    example_001/
+        mail.txt
+        attachments_1.pdf
+        attachments_2.pdf
+        attachments_3.pdf
+        expected_output.json
+    example_002/
+        mail.txt
+        # no attachments — that's fine for a variadic role
+        expected_output.json
+```
+
+In text-extraction mode (`native_files=False`, default), all files for a variadic role are concatenated into a single `<role>…</role>` block. With `native_files=True` each file is passed as a separate `FilePart` inside the same XML tags.
 
 ---
 
