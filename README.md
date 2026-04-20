@@ -37,22 +37,15 @@ Traditional approaches to making LLMs perform complex tasks:
 ## Installation
 
 ```bash
-pip install prompt-forge
-
-# With file type support:
-pip install prompt-forge[pdf]     # PDF loading (pdfplumber + OCR)
-pip install prompt-forge[excel]   # Excel loading
-pip install prompt-forge[docx]    # Word document loading
-pip install prompt-forge[all]     # Everything
-```
-
-**Install directly from GitHub** (latest development version):
-
-```bash
+# Install from GitHub (PyPI release coming soon):
 pip install git+https://github.com/NiccoloTogni/prompt-forge.git
 
-# With extras:
-pip install "prompt-forge[all] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+# With optional extras:
+pip install "prompt-forge[pdf] @ git+https://github.com/NiccoloTogni/prompt-forge.git"        # PDF
+pip install "prompt-forge[excel] @ git+https://github.com/NiccoloTogni/prompt-forge.git"      # Excel
+pip install "prompt-forge[docx] @ git+https://github.com/NiccoloTogni/prompt-forge.git"       # Word
+pip install "prompt-forge[sqlalchemy] @ git+https://github.com/NiccoloTogni/prompt-forge.git" # SQL storage
+pip install "prompt-forge[all] @ git+https://github.com/NiccoloTogni/prompt-forge.git"        # Everything
 ```
 
 ---
@@ -397,14 +390,33 @@ agent = project.get_inference_agent(version=3)
 ### Storage backends
 
 ```python
-from prompt_forge import FileSystemStore, SQLiteStore
+from prompt_forge import Project, SQLAlchemyStore
 
 # Filesystem (default) — JSON files, human-readable, git-friendly
 project = Project("my_project", llm=llm)
 
-# SQLite — better for querying history and metrics
-store = SQLiteStore("./my_project/prompts.db")
-project = Project("my_project", llm=llm, store=store)
+# Any SQL database via SQLAlchemy
+# Requires: pip install "prompt-forge[sqlalchemy]"
+# Plus the relevant DB driver, e.g. psycopg2, pyodbc, etc.
+
+# PostgreSQL
+project = Project("my_project", llm=llm,
+    store=SQLAlchemyStore("postgresql+psycopg2://user:pass@host/db"))
+
+# Azure SQL Server
+project = Project("my_project", llm=llm,
+    store=SQLAlchemyStore(
+        "mssql+pyodbc://user:pass@server.database.windows.net/db"
+        "?driver=ODBC+Driver+18+for+SQL+Server"
+    ))
+
+# SQLite file (single-file alternative to the default JSON layout)
+project = Project("my_project", llm=llm,
+    store=SQLAlchemyStore("sqlite:///./my_project/prompts.db"))
+
+# Multiple projects sharing the same database — namespaced by project_name
+store = SQLAlchemyStore("postgresql+psycopg2://user:pass@host/db", project_name="invoice_extraction")
+project = Project("invoice_extraction", llm=llm, store=store)
 ```
 
 ---
@@ -474,6 +486,7 @@ prompt_forge/
 ├── training/
 │   ├── pipeline.py          # TrainingPipeline + TrainingReport
 │   ├── optimizer.py         # PromptOptimizer — the PE agent
+│   ├── prompt.py            # Default and consolidation meta-prompts
 │   ├── batch_strategy.py    # Batch selection strategies
 │   └── training_log.py      # Compact training history
 ├── inference/
@@ -481,7 +494,7 @@ prompt_forge/
 ├── evaluation/
 │   └── evaluator.py         # Evaluation strategies
 └── storage/
-    └── project_store.py     # FileSystemStore + SQLiteStore backends
+    └── project_store.py     # FileSystemStore + SQLAlchemyStore backends
 ```
 
 ---

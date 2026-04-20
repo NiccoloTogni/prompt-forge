@@ -3,11 +3,13 @@ Tests for prompt_forge.storage.project_store
 """
 
 import json
+import warnings
 import pytest
 from datetime import datetime, timezone
 
 from prompt_forge.storage.project_store import (
     FileSystemStore,
+    SQLAlchemyStore,
     SQLiteStore,
     PromptVersion,
     ProjectStore,
@@ -36,18 +38,15 @@ def fs_store(tmp_path):
 
 
 @pytest.fixture
-def sqlite_store(tmp_path):
-    store = SQLiteStore(tmp_path / "project.db")
-    yield store
-    store.close()
+def sa_store():
+    return SQLAlchemyStore("sqlite://")
 
 
 # ── PromptVersion ─────────────────────────────────────────────────────────────
 
 def test_prompt_version_round_trip():
     v = make_version(version=3, eval_score=0.9, metadata={"key": "val"})
-    d = v.to_dict()
-    restored = PromptVersion.from_dict(d)
+    restored = PromptVersion.from_dict(v.to_dict())
     assert restored.version == 3
     assert restored.prompt_text == "test prompt"
     assert restored.eval_score == pytest.approx(0.9)
@@ -57,7 +56,7 @@ def test_prompt_version_round_trip():
 def test_prompt_version_from_dict_ignores_unknown_fields():
     d = make_version().to_dict()
     d["unknown_field"] = "ignored"
-    v = PromptVersion.from_dict(d)  # should not raise
+    v = PromptVersion.from_dict(d)
     assert v.version == 1
 
 
@@ -75,20 +74,18 @@ def test_filesystem_store_implements_protocol(fs_store):
     assert isinstance(fs_store, ProjectStore)
 
 
-def test_sqlite_store_implements_protocol(sqlite_store):
-    assert isinstance(sqlite_store, ProjectStore)
+def test_sqlalchemy_store_implements_protocol(sa_store):
+    assert isinstance(sa_store, ProjectStore)
 
 
 # ── Shared behaviour (parametrize over both backends) ─────────────────────────
 
-@pytest.fixture(params=["fs", "sqlite"])
+@pytest.fixture(params=["fs", "sqlalchemy"])
 def store(request, tmp_path):
     if request.param == "fs":
         yield FileSystemStore(tmp_path / "project")
     else:
-        s = SQLiteStore(tmp_path / "project.db")
-        yield s
-        s.close()
+        yield SQLAlchemyStore("sqlite://")
 
 
 def test_get_latest_prompt_empty(store):
@@ -104,8 +101,7 @@ def test_list_versions_empty(store):
 
 
 def test_save_and_retrieve_version(store):
-    v = make_version(version=1, prompt_text="hello")
-    store.save_prompt_version(v)
+    store.save_prompt_version(make_version(version=1, prompt_text="hello"))
     retrieved = store.get_prompt_version(1)
     assert retrieved is not None
     assert retrieved.version == 1
@@ -123,55 +119,46 @@ def test_list_versions_returns_ascending_order(store):
     store.save_prompt_version(make_version(version=3))
     store.save_prompt_version(make_version(version=1))
     store.save_prompt_version(make_version(version=2))
-    versions = store.list_versions()
-    assert [v.version for v in versions] == [1, 2, 3]
+    assert [v.version for v in store.list_versions()] == [1, 2, 3]
 
 
 def test_save_overwrites_existing_version(store):
     store.save_prompt_version(make_version(version=1, prompt_text="original"))
     store.save_prompt_version(make_version(version=1, prompt_text="updated"))
-    retrieved = store.get_prompt_version(1)
-    assert retrieved.prompt_text == "updated"
+    assert store.get_prompt_version(1).prompt_text == "updated"
 
 
 def test_save_and_retrieve_eval_score(store):
-    v = make_version(version=1, eval_score=0.85)
-    store.save_prompt_version(v)
+    store.save_prompt_version(make_version(version=1, eval_score=0.85))
     assert store.get_prompt_version(1).eval_score == pytest.approx(0.85)
 
 
 def test_save_and_retrieve_eval_details(store):
     details = {"mean_score": 0.9, "num_examples": 5}
-    v = make_version(version=1, eval_details=details)
-    store.save_prompt_version(v)
-    retrieved = store.get_prompt_version(1).eval_details
-    assert retrieved["mean_score"] == pytest.approx(0.9)
+    store.save_prompt_version(make_version(version=1, eval_details=details))
+    assert store.get_prompt_version(1).eval_details["mean_score"] == pytest.approx(0.9)
 
 
 def test_save_and_retrieve_output_schema(store):
     schema = {"type": "object", "properties": {"field": "string"}}
-    v = make_version(version=1, output_schema=schema)
-    store.save_prompt_version(v)
+    store.save_prompt_version(make_version(version=1, output_schema=schema))
     assert store.get_prompt_version(1).output_schema == schema
 
 
 def test_save_and_retrieve_metadata(store):
-    v = make_version(version=1, metadata={"batch_ids": ["a", "b"], "iteration": 3})
-    store.save_prompt_version(v)
+    store.save_prompt_version(make_version(version=1, metadata={"batch_ids": ["a", "b"], "iteration": 3}))
     meta = store.get_prompt_version(1).metadata
     assert meta["iteration"] == 3
     assert meta["batch_ids"] == ["a", "b"]
 
 
 def test_save_and_retrieve_unicode_prompt(store):
-    v = make_version(version=1, prompt_text="Extracte données: München, €42")
-    store.save_prompt_version(v)
+    store.save_prompt_version(make_version(version=1, prompt_text="Extracte données: München, €42"))
     assert store.get_prompt_version(1).prompt_text == "Extracte données: München, €42"
 
 
 def test_project_config_round_trip(store):
-    config = {"name": "myproject", "context": "some domain", "schema": None}
-    store.save_project_config(config)
+    store.save_project_config({"name": "myproject", "context": "some domain", "schema": None})
     loaded = store.load_project_config()
     assert loaded["name"] == "myproject"
     assert loaded["context"] == "some domain"
@@ -188,8 +175,7 @@ def test_project_config_overwrite(store):
 
 
 def test_training_state_round_trip(store):
-    state = {"last_iteration": 5, "total_tokens_used": 1000}
-    store.save_training_state(state)
+    store.save_training_state({"last_iteration": 5, "total_tokens_used": 1000})
     loaded = store.load_training_state()
     assert loaded["last_iteration"] == 5
     assert loaded["total_tokens_used"] == 1000
@@ -208,7 +194,7 @@ def test_training_state_overwrite(store):
 # ── FileSystemStore specifics ─────────────────────────────────────────────────
 
 def test_filesystem_creates_directories(tmp_path):
-    store = FileSystemStore(tmp_path / "nested" / "project")
+    FileSystemStore(tmp_path / "nested" / "project")
     assert (tmp_path / "nested" / "project").exists()
     assert (tmp_path / "nested" / "project" / "prompts").exists()
 
@@ -226,19 +212,46 @@ def test_filesystem_version_file_is_valid_json(tmp_path):
     assert content["prompt_text"] == "hello"
 
 
-# ── SQLiteStore specifics ─────────────────────────────────────────────────────
+# ── SQLAlchemyStore specifics ─────────────────────────────────────────────────
 
-def test_sqlite_context_manager(tmp_path):
-    with SQLiteStore(tmp_path / "test.db") as store:
+def test_sqlalchemy_context_manager():
+    with SQLAlchemyStore("sqlite://") as store:
         store.save_prompt_version(make_version(version=1))
         assert store.get_prompt_version(1) is not None
-    # no exception means __exit__ closed cleanly
 
 
-def test_sqlite_idempotent_schema_init(tmp_path):
-    """Opening the same DB twice should not raise (migration guard)."""
-    db = tmp_path / "test.db"
-    with SQLiteStore(db) as s1:
-        s1.save_prompt_version(make_version(version=1))
-    with SQLiteStore(db) as s2:
-        assert s2.get_prompt_version(1) is not None
+def test_sqlalchemy_project_name_isolation():
+    """Two projects in the same DB must not see each other's data."""
+    store_a = SQLAlchemyStore("sqlite:///file:pf_test?mode=memory&cache=shared&uri=true", project_name="project_a")
+    store_b = SQLAlchemyStore("sqlite:///file:pf_test?mode=memory&cache=shared&uri=true", project_name="project_b")
+    store_a.save_prompt_version(make_version(version=1, prompt_text="from A"))
+    assert store_b.get_prompt_version(1) is None
+    assert store_b.list_versions() == []
+
+
+def test_sqlalchemy_idempotent_schema_init(tmp_path):
+    """Creating two stores against the same SQLite file should not raise."""
+    db = f"sqlite:///{tmp_path / 'test.db'}"
+    s1 = SQLAlchemyStore(db)
+    s1.save_prompt_version(make_version(version=1))
+    s2 = SQLAlchemyStore(db)
+    assert s2.get_prompt_version(1) is not None
+
+
+# ── SQLiteStore deprecation ───────────────────────────────────────────────────
+
+def test_sqlite_store_emits_deprecation_warning(tmp_path):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        store = SQLiteStore(tmp_path / "legacy.db")
+        store.close()
+    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
+
+
+def test_sqlite_store_still_functional(tmp_path):
+    """Deprecated but must still work for backwards compatibility."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        with SQLiteStore(tmp_path / "legacy.db") as store:
+            store.save_prompt_version(make_version(version=1, prompt_text="legacy"))
+            assert store.get_prompt_version(1).prompt_text == "legacy"

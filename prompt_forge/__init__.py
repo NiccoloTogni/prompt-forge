@@ -28,6 +28,7 @@ from .llm.client import LLMClient, LLMResponse, LLMMessage
 from .file_loaders import FileLoader, FileContent, get_default_loader
 from .storage.project_store import (
     FileSystemStore,
+    SQLAlchemyStore,
     SQLiteStore,
     PromptVersion,
 )
@@ -67,7 +68,8 @@ __all__ = [
     "get_default_loader",
     # Storage
     "FileSystemStore",
-    "SQLiteStore",
+    "SQLAlchemyStore",
+    "SQLiteStore",  # deprecated
     "PromptVersion",
     # Training
     "TrainingPipeline",

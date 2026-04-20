@@ -1,3 +1,3 @@
-from .project_store import FileSystemStore, SQLiteStore, ProjectStore, PromptVersion
+from .project_store import FileSystemStore, SQLAlchemyStore, SQLiteStore, ProjectStore, PromptVersion
 
-__all__ = ["FileSystemStore", "SQLiteStore", "ProjectStore", "PromptVersion"]
+__all__ = ["FileSystemStore", "SQLAlchemyStore", "SQLiteStore", "ProjectStore", "PromptVersion"]

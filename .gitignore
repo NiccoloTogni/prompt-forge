@@ -72,6 +72,10 @@ notebooks/tests_/*
 # streamlit artifacts
 .prompt_forge_ui.json
 
+# Projects
 .projects/*
+
+# Claude
+.claude/
 
 !.gitkeep
