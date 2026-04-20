@@ -77,6 +77,7 @@ class InferenceAgent:
         max_retries: int = 3,
         retry_delay: float = 1.0,
         max_workers: int | None = None,
+        context_retriever: "Callable[[str, LLMClient], str] | None" = None,
     ):
         """
         Args:
@@ -102,6 +103,13 @@ class InferenceAgent:
             max_workers: Maximum number of concurrent LLM calls when the batch
                          falls back to per-input calls (i.e. when file parts are
                          present). None (default) keeps the serial behaviour.
+            context_retriever: Optional callable ``(query: str, llm: LLMClient) -> str``
+                               called before each inference call to fetch relevant
+                               context (e.g. from a vector store or web search).
+                               The returned string is injected as
+                               ``<retrieved_context>…</retrieved_context>`` at the
+                               start of the user message. The query is the best
+                               available text representation of the input.
         """
         self.llm = llm
         self.prompt_text = prompt_text
@@ -116,6 +124,7 @@ class InferenceAgent:
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.max_workers = max_workers
+        self.context_retriever = context_retriever
         self.tokens_used: int = 0
         self._tokens_lock = threading.Lock()  # guards tokens_used under concurrent calls
 
@@ -186,7 +195,10 @@ class InferenceAgent:
         Returns:
             A dict if output_schema is set (JSON parsed), otherwise a plain string.
         """
-        user_content = self._build_user_content(input_text, input_file, input_files, extra_context)
+        retrieved_context = ""
+        if self.context_retriever is not None:
+            retrieved_context = self._retrieve(self._input_query(input_text, input_file, input_files))
+        user_content = self._build_user_content(input_text, input_file, input_files, extra_context, retrieved_context)
         system = self._build_system()
         if self.output_schema:
             system += "\n\nRespond ONLY with valid JSON. Do not include any explanation or text outside the JSON object."
@@ -221,7 +233,8 @@ class InferenceAgent:
         Intended for training/evaluation pipelines where the evaluator handles
         output parsing. Always returns a plain string with code fences stripped.
         """
-        user_content = self._bundle_to_user_content(bundle)
+        extra_context = self._retrieve(self._bundle_query(bundle)) if self.context_retriever else ""
+        user_content = self._bundle_to_user_content(bundle, extra_context=extra_context)
         response = self._call_single(self._build_system(), user_content)
         return self._strip_code_fences(response.text)
 
@@ -243,7 +256,13 @@ class InferenceAgent:
         Returns:
             List of output strings in the same order as the input bundles.
         """
-        user_contents = [self._bundle_to_user_content(b) for b in bundles]
+        user_contents = [
+            self._bundle_to_user_content(
+                b,
+                extra_context=self._retrieve(self._bundle_query(b)) if self.context_retriever else "",
+            )
+            for b in bundles
+        ]
         return [
             json.dumps(o) if isinstance(o, dict) else str(o)
             for o in self._batch_call(user_contents, max_tokens)
@@ -416,15 +435,21 @@ class InferenceAgent:
             system += "\n\n" + self.system_suffix
         return system
 
-    def _bundle_to_user_content(self, bundle: ExampleBundle) -> MessageContent:
+    def _bundle_to_user_content(self, bundle: ExampleBundle, extra_context: str = "") -> MessageContent:
         if not self.native_files:
+            sections = []
+            if extra_context:
+                sections.append(f"<retrieved_context>\n{extra_context}\n</retrieved_context>")
             contents = bundle.load_contents(self.file_loader)
-            return "\n\n".join(
+            sections.extend(
                 f"<{role}>\n{content.text}\n</{role}>"
                 for role, content in contents.items()
                 if not is_output_role(role)
             )
+            return "\n\n".join(sections)
         parts: list[TextPart | FilePart] = []
+        if extra_context:
+            parts.append(TextPart(text=f"<retrieved_context>\n{extra_context}\n</retrieved_context>"))
         for role, raw_path in bundle.files.items():
             if is_output_role(role):
                 continue
@@ -439,6 +464,45 @@ class InferenceAgent:
             parts.append(TextPart(text=f"</{role}>"))
         return parts
 
+    def _retrieve(self, query: str) -> str:
+        """Call the context_retriever and return retrieved context (empty string on failure)."""
+        if not self.context_retriever or not query:
+            return ""
+        try:
+            return self.context_retriever(query, self.llm) or ""
+        except Exception as exc:
+            logger.warning("context_retriever raised an exception: %s", exc)
+            return ""
+
+    def _bundle_query(self, bundle: ExampleBundle) -> str:
+        """Extract a text query from the input roles of a bundle for context retrieval."""
+        parts = []
+        for role, raw_path in bundle.files.items():
+            if is_output_role(role):
+                continue
+            paths = raw_path if isinstance(raw_path, list) else [raw_path]
+            for p in paths:
+                try:
+                    parts.append(self.file_loader.load(p).text)
+                except Exception:
+                    parts.append(str(p))
+        return "\n".join(parts)
+
+    @staticmethod
+    def _input_query(
+        input_text: str | None,
+        input_file: "str | Path | None",
+        input_files: "dict[str, str | Path] | None",
+    ) -> str:
+        """Derive a retrieval query from run() arguments."""
+        if input_text:
+            return input_text
+        if input_file:
+            return str(input_file)
+        if input_files:
+            return " ".join(str(p) for p in input_files.values())
+        return ""
+
     def _post_process(self, text: str) -> "str | dict":
         """Parse JSON if output_schema is set; otherwise strip code fences."""
         if self.output_schema is not None:
@@ -451,10 +515,13 @@ class InferenceAgent:
         input_file: str | Path | None = None,
         input_files: dict[str, str | Path] | None = None,
         extra_context: str = "",
+        retrieved_context: str = "",
     ) -> MessageContent:
         if not self.native_files:
             # Text-extraction path (original behaviour)
             parts: list[str] = []
+            if retrieved_context:
+                parts.append(f"<retrieved_context>\n{retrieved_context}\n</retrieved_context>")
             if extra_context:
                 parts.append(f"<additional_context>\n{extra_context}\n</additional_context>")
             if input_text is not None:
@@ -472,6 +539,8 @@ class InferenceAgent:
 
         # Native-file path — pass files directly as content parts
         multimodal: list[TextPart | FilePart] = []
+        if retrieved_context:
+            multimodal.append(TextPart(text=f"<retrieved_context>\n{retrieved_context}\n</retrieved_context>"))
         if extra_context:
             multimodal.append(TextPart(text=f"<additional_context>\n{extra_context}\n</additional_context>"))
         if input_text is not None:

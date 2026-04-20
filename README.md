@@ -392,6 +392,37 @@ report = project.train(
 
 ---
 
+### Context retrieval (RAG / web search hook)
+
+Inject external context before each inference call by providing a `context_retriever`. The callable receives the query text and the LLM client, and returns a string that is prepended to the user message as `<retrieved_context>`:
+
+```python
+def my_retriever(query: str, llm) -> str:
+    # query is the best available text representation of the input
+    results = my_vector_store.search(query, top_k=3)
+    return "\n\n".join(r.text for r in results)
+
+agent = project.get_inference_agent(context_retriever=my_retriever)
+result = agent.run(input_file="document.pdf")
+```
+
+The retriever can also call back into the LLM client for query rewriting or re-ranking:
+
+```python
+def rewriting_retriever(query: str, llm) -> str:
+    # Use a cheap model call to turn the raw input into a focused search query
+    rewrite_resp = llm.complete([
+        LLMMessage(role="system", content="Extract a short search query from this input."),
+        LLMMessage(role="user", content=query[:2000]),
+    ])
+    hits = my_vector_store.search(rewrite_resp.text.strip(), top_k=5)
+    return "\n\n".join(h.text for h in hits)
+```
+
+If the retriever raises, the error is logged as a warning and inference continues without retrieved context — the retriever never blocks the main call.
+
+---
+
 ### Prompt consolidation
 
 After many iterations the optimizer accumulates rules and the prompt grows. When you decide it has become unwieldy, call `consolidate()` explicitly to merge redundant and overlapping rules while preserving all distinct coverage:
