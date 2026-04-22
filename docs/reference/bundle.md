@@ -128,7 +128,7 @@ data/
         expected_output.json
 ```
 
-Files inside each subdirectory are matched to schema roles by filename prefix: `{role}.ext` or `{role}_*.ext`. Returns the number of successfully loaded bundles. Bundles that fail schema validation are silently skipped (a warning is logged).
+Files inside each subdirectory are matched to schema roles by filename prefix: `{role}.ext` or `{role}_*.ext`. Returns the number of successfully loaded bundles. Bundles that fail schema validation are skipped (a warning is logged).
 
 #### `get_batch(ids: list[str]) → list[ExampleBundle]`
 
