@@ -288,7 +288,7 @@ def test_batch_falls_back_to_sequential_with_file_parts(tmp_path):
 
 def test_batch_uses_single_call_without_file_parts(tmp_path):
     from prompt_forge.file_loaders import get_default_loader
-    llm = CapturingLLM(response_text='["r1", "r2", "r3"]')
+    llm = CapturingLLM(response_text='<output id="1">r1</output><output id="2">r2</output><output id="3">r3</output>')
     agent = make_agent(llm, native_files=False, file_loader=get_default_loader())
 
     bundles = [

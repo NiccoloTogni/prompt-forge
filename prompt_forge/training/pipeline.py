@@ -15,7 +15,7 @@ it left off using the stored training state.
 import dataclasses
 import logging
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Any, Callable
 
 from ..llm.client import LLMClient
 from ..bundle import BundleCollection, ExampleBundle
@@ -58,6 +58,7 @@ class TrainingConfig:
     max_retries: int = 3                  # Retries per failed LLM call (optimizer + eval agent)
     retry_delay: float = 1.0             # Initial retry wait in seconds (doubles each attempt)
     max_workers: int | None = None       # Concurrent LLM calls for per-input batch fallback (None = serial)
+    context_retriever: "Callable[[str, Any], str] | None" = None  # Retriever used by the eval agent — must match production
 
 
 @dataclasses.dataclass
@@ -212,6 +213,7 @@ class TrainingPipeline:
             max_retries=config.max_retries,
             retry_delay=config.retry_delay,
             max_workers=config.max_workers,
+            context_retriever=config.context_retriever,
         )
         self.optimizer.max_retries = config.max_retries
         self.optimizer.retry_delay = config.retry_delay

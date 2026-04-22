@@ -396,8 +396,9 @@ class PromptOptimizer:
         """
         Compress a grown prompt by merging redundant/overlapping rules.
 
-        Preserves all distinct coverage while reducing length. Called automatically
-        by the pipeline when ``TrainingConfig.max_prompt_chars`` is exceeded.
+        Preserves all distinct coverage while reducing length. Call this explicitly
+        via ``TrainingPipeline.consolidate()`` or ``Project.consolidate()`` when you
+        decide the prompt has grown unwieldy — it is never triggered automatically.
 
         Returns:
             OptimizerResult with the consolidated prompt (learnings/issues are empty).

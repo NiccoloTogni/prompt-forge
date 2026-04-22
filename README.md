@@ -354,6 +354,27 @@ agent = project.get_inference_agent(max_retries=3, retry_delay=1.0)
 
 ---
 
+### LLM response caching
+
+Wrap any LLM client with `CachedLLM` to cache responses by input hash. Identical calls are served from the cache without a network round-trip — token usage for cache hits is reported as zero.
+
+```python
+from prompt_forge import CachedLLM, Project
+
+# In-memory cache (cleared on process exit)
+project = Project("my_project", llm=CachedLLM(my_llm))
+
+# Persistent disk cache across runs (requires: pip install diskcache)
+import diskcache
+project = Project("my_project", llm=CachedLLM(my_llm, cache=diskcache.Cache(".llm_cache")))
+```
+
+The cache key is a SHA-256 hash of the full message content and kwargs. `FilePart` inputs are keyed by file *bytes*, not path — so a stale hit after a file update is not possible. You can monitor efficiency via `cached_llm.hit_rate`.
+
+The eval loop is the highest-value target: the same validation bundles are re-evaluated every iteration, so cache hit rates are near 100% once the val set has been seen once.
+
+---
+
 ### Concurrent batch inference
 
 When inputs contain native file parts (PDFs, images), the agent cannot batch them into a single call. Set `max_workers` to process them concurrently instead of sequentially:
@@ -420,6 +441,16 @@ def rewriting_retriever(query: str, llm) -> str:
 ```
 
 If the retriever raises, the error is logged as a warning and inference continues without retrieved context — the retriever never blocks the main call.
+
+> **Important:** if your production agent uses a context retriever, pass the same retriever to the training loop via `TrainingConfig(context_retriever=...)`. Without it, the eval agent sees a different input distribution than production and the training signal is misleading.
+
+```python
+report = project.train(
+    train_bundles,
+    val_bundles=val_bundles,
+    config=TrainingConfig(context_retriever=my_retriever),
+)
+```
 
 ---
 
@@ -675,6 +706,8 @@ prompt_forge/
 ├── project.py               # Project — main entry point
 ├── bundle.py                # ExampleBundle, BundleSchema, BundleCollection
 ├── utils.py                 # train_val_split and other helpers
+├── _retry.py                # call_with_retry — exponential backoff used across all LLM calls
+├── caching.py               # CachedLLM — transparent response cache wrapper
 ├── llm/
 │   └── client.py            # LLMClient protocol (provider-agnostic)
 ├── file_loaders/
@@ -682,7 +715,7 @@ prompt_forge/
 ├── training/
 │   ├── pipeline.py          # TrainingPipeline + TrainingReport
 │   ├── optimizer.py         # PromptOptimizer — the PE agent
-│   ├── prompt.py            # Default and consolidation meta-prompts
+│   ├── prompt.py            # DEFAULT_OPTIMIZER_PROMPT, DEFAULT_CONSOLIDATION_PROMPT
 │   ├── batch_strategy.py    # Batch selection strategies
 │   └── training_log.py      # Compact training history
 ├── inference/

@@ -41,6 +41,7 @@ from .training.batch_strategy import (
     FailurePriorityBatchStrategy,
 )
 from .training.training_log import TrainingLog
+from .caching import CachedLLM
 from .evaluation.evaluator import (
     Evaluator,
     EvalResult,
@@ -54,6 +55,7 @@ __all__ = [
     # Core
     "Project",
     "InferenceAgent",
+    "CachedLLM",
     "train_val_split",
     # LLM
     "LLMClient",

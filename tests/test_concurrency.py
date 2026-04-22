@@ -137,7 +137,7 @@ def test_text_batch_still_uses_single_call(tmp_path):
     """max_workers must not affect the text-only single-call batch path."""
     from prompt_forge.file_loaders import get_default_loader
 
-    llm = ThreadTrackingLLM(response_text='["r0", "r1", "r2"]')
+    llm = ThreadTrackingLLM(response_text='<output id="1">r0</output><output id="2">r1</output><output id="3">r2</output>')
     agent = InferenceAgent(
         llm=llm,
         prompt_text="sys",

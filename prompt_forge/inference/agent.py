@@ -223,7 +223,16 @@ class InferenceAgent:
             list[dict] when output_schema is set — each element is a parsed JSON object,
             equivalent to calling run() on each input individually.
         """
-        user_contents = [self._build_user_content(**kw) for kw in inputs]
+        user_contents = []
+        for kw in inputs:
+            retrieved = ""
+            if self.context_retriever is not None:
+                retrieved = self._retrieve(self._input_query(
+                    kw.get("input_text"),
+                    kw.get("input_file"),
+                    kw.get("input_files"),
+                ))
+            user_contents.append(self._build_user_content(**kw, retrieved_context=retrieved))
         return self._batch_call(user_contents, max_tokens)
 
     def run_bundle(self, bundle: ExampleBundle) -> str:
@@ -233,8 +242,8 @@ class InferenceAgent:
         Intended for training/evaluation pipelines where the evaluator handles
         output parsing. Always returns a plain string with code fences stripped.
         """
-        extra_context = self._retrieve(self._bundle_query(bundle)) if self.context_retriever else ""
-        user_content = self._bundle_to_user_content(bundle, extra_context=extra_context)
+        retrieved_context = self._retrieve(self._bundle_query(bundle)) if self.context_retriever else ""
+        user_content = self._bundle_to_user_content(bundle, retrieved_context=retrieved_context)
         response = self._call_single(self._build_system(), user_content)
         return self._strip_code_fences(response.text)
 
@@ -259,7 +268,7 @@ class InferenceAgent:
         user_contents = [
             self._bundle_to_user_content(
                 b,
-                extra_context=self._retrieve(self._bundle_query(b)) if self.context_retriever else "",
+                retrieved_context=self._retrieve(self._bundle_query(b)) if self.context_retriever else "",
             )
             for b in bundles
         ]
@@ -312,11 +321,15 @@ class InferenceAgent:
             return [self._post_process(f.result().text) for f in futures]
 
     def _single_batch_call(self, user_contents: list[str]) -> list:
-        """Send all inputs in one LLM call; parse a JSON array response.
+        """Send all inputs in one LLM call using XML output tags.
+
+        Each output is delimited by <output id="N">…</output> tags, which are
+        more reliably produced than a JSON array and degrade gracefully when the
+        LLM adds surrounding prose.
 
         Returns a list of strings (no output_schema) or dicts (output_schema set).
-        Raises ValueError / json.JSONDecodeError on parse failure or wrong item count,
-        which triggers the sequential fallback in the pipeline.
+        Raises ValueError on parse failure, which triggers the sequential fallback
+        in the pipeline.
         """
         n = len(user_contents)
         input_blocks = "\n\n".join(
@@ -326,16 +339,14 @@ class InferenceAgent:
 
         if self.output_schema:
             format_instruction = (
-                f"Return a JSON array of exactly {n} objects. "
-                f"Each object must follow the output schema. "
-                f"Respond with ONLY the JSON array, no surrounding text:\n"
-                f'[{{"field": "value"}}, {{"field": "value"}}, ...]'
+                f'Wrap each answer in <output id="N">…</output> tags where N matches '
+                f"the input id. Each answer must be a valid JSON object matching the "
+                f"required schema. Do not include any text outside the output tags."
             )
         else:
             format_instruction = (
-                f"Return a JSON array of exactly {n} strings, one per input, in order. "
-                f"Respond with ONLY the JSON array, no surrounding text:\n"
-                f'["output for input 1", "output for input 2", ...]'
+                f'Wrap each answer in <output id="N">…</output> tags where N matches '
+                f"the input id. Do not include any text outside the output tags."
             )
 
         user_message = (
@@ -345,28 +356,19 @@ class InferenceAgent:
             f"{input_blocks}"
         )
         response = self._call_single(self._build_system(), user_message)
+        text = response.text
+        logger.debug("Batch inference raw response (first 500 chars): %r", text[:500])
 
-        # Strip optional code fence, then parse the JSON array.
-        # If the LLM prepends prose before the array, fall back to extracting
-        # the first [...] block found anywhere in the response.
-        text = response.text.strip()
-        logger.debug(f"Batch inference raw response (first 500 chars): {text[:500]!r}")
-
-        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
-        if fence_match:
-            text = fence_match.group(1).strip()
-
-        if not text.startswith("["):
-            array_match = re.search(r"(\[[\s\S]*\])", text)
-            if array_match:
-                text = array_match.group(1).strip()
-
-        outputs = json.loads(text)  # raises json.JSONDecodeError on failure → triggers fallback
-
-        if not isinstance(outputs, list):
-            raise ValueError(f"Batch inference: expected JSON array, got {type(outputs).__name__}")
-        if len(outputs) != n:
-            raise ValueError(f"Batch inference: expected {n} outputs, got {len(outputs)}")
+        outputs = []
+        for i in range(1, n + 1):
+            match = re.search(rf'<output\s+id="{i}">(.*?)</output>', text, re.DOTALL)
+            if not match:
+                raise ValueError(
+                    f'Batch inference: <output id="{i}"> missing from response '
+                    f"({n} inputs sent). Triggering sequential fallback."
+                )
+            content = match.group(1).strip()
+            outputs.append(self._extract_json(content) if self.output_schema else self._strip_code_fences(content))
 
         return outputs
 
@@ -435,11 +437,11 @@ class InferenceAgent:
             system += "\n\n" + self.system_suffix
         return system
 
-    def _bundle_to_user_content(self, bundle: ExampleBundle, extra_context: str = "") -> MessageContent:
+    def _bundle_to_user_content(self, bundle: ExampleBundle, retrieved_context: str = "") -> MessageContent:
         if not self.native_files:
             sections = []
-            if extra_context:
-                sections.append(f"<retrieved_context>\n{extra_context}\n</retrieved_context>")
+            if retrieved_context:
+                sections.append(f"<retrieved_context>\n{retrieved_context}\n</retrieved_context>")
             contents = bundle.load_contents(self.file_loader)
             sections.extend(
                 f"<{role}>\n{content.text}\n</{role}>"
@@ -448,8 +450,8 @@ class InferenceAgent:
             )
             return "\n\n".join(sections)
         parts: list[TextPart | FilePart] = []
-        if extra_context:
-            parts.append(TextPart(text=f"<retrieved_context>\n{extra_context}\n</retrieved_context>"))
+        if retrieved_context:
+            parts.append(TextPart(text=f"<retrieved_context>\n{retrieved_context}\n</retrieved_context>"))
         for role, raw_path in bundle.files.items():
             if is_output_role(role):
                 continue

@@ -1,5 +1,5 @@
 """
-Tests for the context_retriever hook on InferenceAgent.
+Tests for the context_retriever hook on InferenceAgent and TrainingConfig.
 """
 
 from pathlib import Path
@@ -10,6 +10,7 @@ from prompt_forge.bundle import ExampleBundle
 from prompt_forge.inference.agent import InferenceAgent
 from prompt_forge.llm.client import LLMMessage, LLMResponse, TextPart, FilePart
 from prompt_forge.file_loaders import get_default_loader
+from prompt_forge.training.pipeline import TrainingConfig
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -64,6 +65,29 @@ def test_no_retriever_bundle(tmp_path):
 
 # ── Retriever injects context ─────────────────────────────────────────────────
 
+def test_retriever_injected_in_run_batch():
+    received_queries = []
+
+    def retriever(query, llm_client):
+        received_queries.append(query)
+        return "batch snippet"
+
+    llm = CapturingLLM(response_text='<output id="1">out1</output><output id="2">out2</output>')
+    agent = InferenceAgent(
+        llm=llm,
+        prompt_text="sys",
+        native_files=False,
+        file_loader=get_default_loader(),
+        context_retriever=retriever,
+    )
+    agent.run_batch([{"input_text": "query one"}, {"input_text": "query two"}])
+
+    assert received_queries == ["query one", "query two"]
+    # Both user messages sent in the single batched call contain retrieved context
+    user_content = llm.calls[-1][1].content
+    assert user_content.count("<retrieved_context>") == 2
+
+
 def test_retriever_injected_in_run(tmp_path):
     llm = CapturingLLM()
     retriever = lambda query, llm_client: "relevant snippet"
@@ -82,7 +106,7 @@ def test_retriever_injected_in_run_bundle(tmp_path):
 
 
 def test_retriever_injected_in_run_bundle_batch(tmp_path):
-    llm = CapturingLLM(response_text='["r0", "r1"]')
+    llm = CapturingLLM(response_text='<output id="1">r0</output><output id="2">r1</output>')
     call_count = [0]
 
     def retriever(query, llm_client):
@@ -146,6 +170,81 @@ def test_retriever_merges_with_extra_context():
     content = llm.last_user_content
     assert "retrieved" in content
     assert "user hint" in content
+
+
+# ── TrainingConfig wires retriever to eval agent ─────────────────────────────
+
+def test_training_config_context_retriever_default():
+    assert TrainingConfig().context_retriever is None
+
+
+def test_training_config_context_retriever_set():
+    retriever = lambda q, llm: "ctx"
+    config = TrainingConfig(context_retriever=retriever)
+    assert config.context_retriever is retriever
+
+
+def test_eval_agent_receives_context_retriever(tmp_path):
+    """Eval agent built inside train() must carry the context_retriever."""
+    from unittest.mock import MagicMock
+    from prompt_forge.training.pipeline import TrainingPipeline
+    from prompt_forge.storage.project_store import FileSystemStore
+    from prompt_forge.llm.client import LLMResponse
+
+    # Minimal LLM that records whether retriever was called during eval
+    retriever_calls = []
+
+    def retriever(query, llm_client):
+        retriever_calls.append(query)
+        return "retrieved"
+
+    llm = MagicMock()
+    # Optimizer response
+    llm.complete.return_value = LLMResponse(
+        text="<optimized_prompt>better</optimized_prompt><learnings>ok</learnings><issues></issues>",
+        usage={"input_tokens": 1, "output_tokens": 1},
+    )
+
+    store = FileSystemStore(tmp_path / "store")
+    store.save_prompt_version(__import__("prompt_forge.storage.project_store", fromlist=["PromptVersion"]).PromptVersion(
+        version=1, prompt_text="seed", created_at="2024-01-01T00:00:00+00:00",
+    ))
+
+    # One training bundle and one val bundle (text files)
+    (tmp_path / "t").mkdir(); (tmp_path / "v").mkdir()
+    (tmp_path / "t" / "t_input.txt").write_text("train input")
+    (tmp_path / "t" / "t_expected_output.txt").write_text("train out")
+    (tmp_path / "v" / "v_input.txt").write_text("val input")
+    (tmp_path / "v" / "v_expected_output.txt").write_text("val out")
+
+    train_b = ExampleBundle(bundle_id="t", files={
+        "input": tmp_path / "t" / "t_input.txt",
+        "expected_output": tmp_path / "t" / "t_expected_output.txt",
+    })
+    val_b = ExampleBundle(bundle_id="v", files={
+        "input": tmp_path / "v" / "v_input.txt",
+        "expected_output": tmp_path / "v" / "v_expected_output.txt",
+    })
+
+    from prompt_forge.evaluation.evaluator import ExactMatchEvaluator
+
+    pipeline = TrainingPipeline(
+        llm=llm,
+        store=store,
+        evaluator=ExactMatchEvaluator(),
+        file_loader=get_default_loader(),
+    )
+    pipeline.train(
+        [train_b],
+        val_bundles=[val_b],
+        config=TrainingConfig(
+            max_iterations=1,
+            native_files=False,
+            context_retriever=retriever,
+        ),
+    )
+
+    assert retriever_calls, "context_retriever was never called by the eval agent"
 
 
 # ── Native file path ──────────────────────────────────────────────────────────
