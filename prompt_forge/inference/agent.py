@@ -490,8 +490,8 @@ class InferenceAgent:
                     parts.append(str(p))
         return "\n".join(parts)
 
-    @staticmethod
     def _input_query(
+        self,
         input_text: str | None,
         input_file: "str | Path | None",
         input_files: "dict[str, str | Path] | None",
@@ -500,9 +500,18 @@ class InferenceAgent:
         if input_text:
             return input_text
         if input_file:
-            return str(input_file)
+            try:
+                return self.file_loader.load(input_file).text
+            except Exception:
+                return str(input_file)
         if input_files:
-            return " ".join(str(p) for p in input_files.values())
+            parts = []
+            for path in input_files.values():
+                try:
+                    parts.append(self.file_loader.load(path).text)
+                except Exception:
+                    parts.append(str(path))
+            return " ".join(parts)
         return ""
 
     def _post_process(self, text: str) -> "str | dict":

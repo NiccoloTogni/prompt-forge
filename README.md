@@ -2,14 +2,12 @@
   <img src="resources/promptforge-logo.png" width="500" alt="PromptForge logo"/>
 </p>
 
-<!-- <h1 align="center">PromptForge</h1> -->
 <p align="center"><em>Iterative, example-based prompt optimization — no fine-tuning required.</em></p>
 
 <p align="center">
-  <a href="#installation">Installation</a> ·
-  <a href="#quick-start">Quick Start</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#architecture">Architecture</a>
+  <a href="docs/quickstart.md">Quickstart</a> ·
+  <a href="docs/concepts.md">Concepts</a> ·
+  <a href="docs/reference/">Reference</a>
 </p>
 
 ---
@@ -37,747 +35,65 @@ Traditional approaches to making LLMs perform complex tasks:
 ## Installation
 
 ```bash
-# Install from GitHub (PyPI release coming soon):
 pip install git+https://github.com/NiccoloTogni/prompt-forge.git
 
-# With optional extras:
-pip install "prompt-forge[pdf] @ git+https://github.com/NiccoloTogni/prompt-forge.git"        # PDF
-pip install "prompt-forge[excel] @ git+https://github.com/NiccoloTogni/prompt-forge.git"      # Excel
-pip install "prompt-forge[docx] @ git+https://github.com/NiccoloTogni/prompt-forge.git"       # Word
-pip install "prompt-forge[sqlalchemy] @ git+https://github.com/NiccoloTogni/prompt-forge.git" # SQL storage
-pip install "prompt-forge[all] @ git+https://github.com/NiccoloTogni/prompt-forge.git"        # Everything
+# Optional extras
+pip install "prompt-forge[pdf]        @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+pip install "prompt-forge[sqlalchemy] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+pip install "prompt-forge[duckduckgo] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+pip install "prompt-forge[all]        @ git+https://github.com/NiccoloTogni/prompt-forge.git"
 ```
+
+Supported file extras: `pdf`, `excel`, `docx`. Storage: `sqlalchemy`. Search: `duckduckgo`, `tavily`.
 
 ---
 
 ## Quick Start
 
-### 1. Implement an LLM client
-
-PromptForge is provider-agnostic. Wrap any LLM in the `LLMClient` protocol:
-
 ```python
-from prompt_forge import LLMMessage, LLMResponse
+from prompt_forge import Project, TrainingConfig, train_val_split
 
+# 1. Wrap your LLM (any provider)
 class MyLLM:
-    def complete(self, messages: list[LLMMessage], **kwargs) -> LLMResponse:
-        # call your provider here
-        ...
-        return LLMResponse(text=..., usage={"input_tokens": ..., "output_tokens": ...})
-```
+    def complete(self, messages, **kwargs):
+        ...  # call your provider, return LLMResponse(text=..., usage={...})
 
-<details>
-<summary>Example: Azure OpenAI Chat Completions (text only)</summary>
+project = Project("invoice_extractor", llm=MyLLM())
 
-```python
-from openai import AzureOpenAI
-from prompt_forge import LLMMessage, LLMResponse
+# 2. Define the example structure and a seed prompt
+project.set_bundle_schema(input=".pdf", expected_output=".json")
+project.set_context("Purchase order invoices from European manufacturers.")
+project.set_seed_prompt("Extract all relevant fields and return structured JSON.")
 
-class AzureClient:
-    def __init__(self, deployment: str, **kwargs):
-        self.client = AzureOpenAI(**kwargs)
-        self.deployment = deployment
-
-    def complete(self, messages: list[LLMMessage], **kwargs) -> LLMResponse:
-        resp = self.client.chat.completions.create(
-            model=self.deployment,
-            messages=[{"role": m.role, "content": m.content} for m in messages],
-            **kwargs,
-        )
-        return LLMResponse(
-            text=resp.choices[0].message.content,
-            usage={
-                "input_tokens": resp.usage.prompt_tokens,
-                "output_tokens": resp.usage.completion_tokens,
-            },
-        )
-
-llm = AzureClient(
-    deployment="gpt-4o",
-    azure_endpoint="https://your-resource.openai.azure.com/",
-    api_version="2024-02-01",
-    api_key="your-key",
-)
-```
-</details>
-
-<details>
-<summary>Example: Azure OpenAI Responses API (native file support)</summary>
-
-Use this when you want to pass PDFs, images, and other files directly to the model
-without text extraction. Requires `native_files=True` on the inference agent and a
-model that supports the Responses API (api-version `2025-03-01-preview` or later).
-
-```python
-import base64
-from openai import AzureOpenAI
-from prompt_forge import LLMMessage, LLMResponse, TextPart, FilePart
-
-class AzureResponsesClient:
-    def __init__(self, deployment: str, **kwargs):
-        self.client = AzureOpenAI(**kwargs)
-        self.deployment = deployment
-
-    def complete(self, messages: list[LLMMessage], **kwargs) -> LLMResponse:
-        input_ = []
-        for m in messages:
-            if isinstance(m.content, str):
-                input_.append({"role": m.role, "content": m.content})
-            else:
-                parts = []
-                for part in m.content:
-                    if isinstance(part, TextPart):
-                        parts.append({"type": "input_text", "text": part.text})
-                    elif isinstance(part, FilePart):
-                        if part.file_id:
-                            parts.append({"type": "input_file", "file_id": part.file_id})
-                        else:
-                            data = base64.b64encode(part.path.read_bytes()).decode()
-                            mime = part.media_type or "application/octet-stream"
-                            parts.append({
-                                "type": "input_file",
-                                "filename": part.path.name,
-                                "file_data": f"data:{mime};base64,{data}",
-                            })
-                input_.append({"role": m.role, "content": parts})
-
-        resp = self.client.responses.create(model=self.deployment, input=input_, **kwargs)
-        return LLMResponse(
-            text=resp.output_text,
-            usage={
-                "input_tokens": resp.usage.input_tokens,
-                "output_tokens": resp.usage.output_tokens,
-            },
-        )
-
-llm = AzureResponsesClient(
-    deployment="gpt-4o",
-    azure_endpoint="https://your-resource.openai.azure.com/",
-    api_version="2025-03-01-preview",
-    api_key="your-key",
-)
-
-# Enable native file passing at inference time
-agent = project.get_inference_agent(native_files=True)
-result = agent.run(input_file="invoice.pdf")   # PDF passed natively — no text extraction
-```
-
-> **Note:** The Chat Completions client above does not handle `FilePart` content — use it only
-> with `native_files=False`. Using `native_files=True` (the default) with a text-only client
-> will raise an error from the provider when it receives unexpected content types.
-</details>
-
----
-
-### 2. Set up a project
-
-```python
-from prompt_forge import Project
-
-project = Project("invoice_extraction", llm=llm)
-
-# Define what an "example" looks like (role → file extension)
-project.set_bundle_schema(
-    input=".pdf",
-    expected_output=".json",
-)
-
-# Optional: domain context helps the optimizer understand the task
-project.set_context(
-    "These are heat exchanger purchase orders from European manufacturers. "
-    "Fields to extract: model, manufacturer, thermal capacity (kW), "
-    "pressure rating (bar), material, price, delivery date. "
-    "Units are metric. Prices in EUR unless stated otherwise."
-)
-
-# Starting point — can be very generic
-project.set_seed_prompt(
-    "You are a data extraction agent. Extract all relevant fields from "
-    "the provided document and return them as structured JSON."
-)
-```
-
-### 3. Load training examples
-
-```
-training_data/
-    example_001/
-        input.pdf
-        expected_output.json
-    example_002/
-        input.pdf
-        expected_output.json
-    ...
-```
-
-```python
+# 3. Load examples (one subdirectory per example)
 project.add_examples_from_directory("./training_data/")
-print(f"Loaded {project.num_examples} examples")
-```
 
-### 4. Train
+# 4. Train
+train, val = train_val_split(project.bundles, val_ratio=0.2, seed=42)
+report = project.train(train, val_bundles=val, eval_strategy="json_fields",
+                       config=TrainingConfig(batch_size=5, max_iterations=20, patience=3))
 
-Split your examples into training and validation sets, then run the loop:
-
-```python
-from prompt_forge import TrainingConfig, train_val_split
-
-train_bundles, val_bundles = train_val_split(project.bundles, val_ratio=0.2, seed=42)
-
-report = project.train(
-    train_bundles,
-    val_bundles=val_bundles,
-    config=TrainingConfig(
-        batch_size=5,        # Examples per optimizer call
-        max_iterations=20,   # Hard stop
-        patience=3,          # Stop after 3 non-improving iterations
-    ),
-    eval_strategy="json_fields",   # Field-by-field JSON comparison
-)
-
-for r in report:
-    status = "✓" if r.improved else "✗"
-    before = f"{r.score_before:.2f}" if r.score_before is not None else "—"
-    after  = f"{r.score_after:.2f}"  if r.score_after  is not None else "—"
-    print(f"Iter {r.iteration}: {before} → {after} {status}")
-
-# Training signals whether human review is recommended
-if report.refinement_recommended:
-    score_str = f"{report.final_score:.2f}" if report.final_score is not None else "unknown"
-    print(f"Score {score_str} — consider reviewing and editing the prompt manually")
-
-# Summarise recurring gaps the optimizer couldn't resolve — tells you what
-# training data to add before the next run (one cheap LLM call)
-summary = report.aggregate_issues(llm)
-if summary:
-    print("\nRecurring issues:\n", summary)
-```
-
-### 5. Run inference
-
-```python
+# 5. Run inference with the trained prompt
 agent = project.get_inference_agent()
 result = agent.run(input_file="new_invoice.pdf")
-print(result)   # str, or dict if output_schema is set
 ```
+
+See **[docs/quickstart.md](docs/quickstart.md)** for the full step-by-step guide.
 
 ---
 
 ## Features
 
-### Structured JSON output
-
-Declare that your task produces structured JSON and the optimizer will automatically generate prompts that enforce valid JSON output. At inference time, the agent parses and validates the response.
-
-```python
-project.set_output_schema({
-    "invoice_number": "string",
-    "supplier":       "string",
-    "total_eur":      "number",
-    "line_items":     "array",
-    "delivery_date":  "string",
-})
-
-report = project.train(eval_strategy="json_fields")
-
-agent = project.get_inference_agent()
-result = agent.run(input_file="invoice.pdf")
-print(result["total_eur"])   # dict, not a string
-```
-
-If the schema is not set explicitly, the optimizer **auto-detects** structured output by inspecting expected-output files: if ≥50% parse as JSON objects, it infers the schema from the union of their top-level keys.
-
-You can also supply an exact JSON Schema object:
-
-```python
-project.set_output_schema({
-    "type": "object",
-    "properties": {
-        "invoice_number": {"type": "string"},
-        "total_eur":      {"type": "number"},
-    }
-})
-```
-
----
-
-### Context window management
-
-Prevent optimizer calls from exceeding your model's context window:
-
-```python
-report = project.train(
-    config=TrainingConfig(max_tokens=100_000),   # Hard limit for the optimizer call
-)
-```
-
-- If the **full batch** exceeds the budget, it is trimmed automatically and a `WARNING` is logged.
-- If a **single example** is too large to fit on its own, training fails immediately with a clear error message identifying the offending example.
-
-For precise token counting, provide a model-specific tokenizer:
-
-```python
-import tiktoken
-enc = tiktoken.encoding_for_model("gpt-4o")
-
-report = project.train(
-    config=TrainingConfig(max_tokens=128_000),
-    optimizer_kwargs={"token_estimator": lambda text: len(enc.encode(text))},
-)
-```
-
-The default estimator uses `len(text) // 4` (~4 chars/token).
-
----
-
-### Reproducibility
-
-Set a `seed` to make batch selection deterministic across runs:
-
-```python
-report = project.train(
-    config=TrainingConfig(seed=42),
-)
-```
-
----
-
-### Train score (optional, off by default)
-
-Per-example val scores (`bundle_id → score`) are always available when an evaluator is set. Train-batch scores require opting in via `eval_train=True` (costs extra tokens — disabled by default):
-
-```python
-report = project.train(
-    train_bundles, val_bundles=val_bundles,
-    config=TrainingConfig(eval_train=True),
-)
-
-for r in report:
-    train = f"{r.train_score:.3f}" if r.train_score is not None else "—"
-    val   = f"{r.score_after:.3f}"  if r.score_after  is not None else "—"
-    print(f"Iter {r.iteration}: train={train}  val={val}")
-
-    # Per-example breakdown — useful for spotting regressions
-    if r.val_example_scores:
-        for bundle_id, score in sorted(r.val_example_scores.items()):
-            print(f"  {bundle_id}: {score:.3f}")
-```
-
----
-
-### Retry and resilience
-
-All LLM calls (optimizer, evaluator, inference agent) automatically retry on failure with exponential backoff. Configure globally via `TrainingConfig` or per-component:
-
-```python
-report = project.train(
-    config=TrainingConfig(
-        max_retries=5,      # attempts per call (default 3)
-        retry_delay=2.0,    # initial wait in seconds, doubles each attempt (default 1.0)
-    ),
-)
-
-# Or on the inference agent directly
-agent = project.get_inference_agent(max_retries=3, retry_delay=1.0)
-```
-
----
-
-### LLM response caching
-
-Wrap any LLM client with `CachedLLM` to cache responses by input hash. Identical calls are served from the cache without a network round-trip — token usage for cache hits is reported as zero.
-
-```python
-from prompt_forge import CachedLLM, Project
-
-# In-memory cache (cleared on process exit)
-project = Project("my_project", llm=CachedLLM(my_llm))
-
-# Persistent disk cache across runs (requires: pip install diskcache)
-import diskcache
-project = Project("my_project", llm=CachedLLM(my_llm, cache=diskcache.Cache(".llm_cache")))
-```
-
-The cache key is a SHA-256 hash of the full message content and kwargs. `FilePart` inputs are keyed by file *bytes*, not path — so a stale hit after a file update is not possible. You can monitor efficiency via `cached_llm.hit_rate`.
-
-The eval loop is the highest-value target: the same validation bundles are re-evaluated every iteration, so cache hit rates are near 100% once the val set has been seen once.
-
----
-
-### Concurrent batch inference
-
-When inputs contain native file parts (PDFs, images), the agent cannot batch them into a single call. Set `max_workers` to process them concurrently instead of sequentially:
-
-```python
-agent = project.get_inference_agent(max_workers=8)
-results = agent.run_bundle_batch(bundles)   # up to 8 concurrent LLM calls
-
-# Or via TrainingConfig for the eval loop
-report = project.train(
-    config=TrainingConfig(max_workers=8),
-)
-```
-
-Results are always returned in the same order as the input bundles regardless of completion order.
-
----
-
-### Custom optimizer prompts
-
-The prompts used by the Prompt Engineering Agent and the consolidation step are fully configurable. Inspect the defaults to understand the expected format, then pass overrides:
-
-```python
-from prompt_forge import DEFAULT_OPTIMIZER_PROMPT, DEFAULT_CONSOLIDATION_PROMPT
-
-# Inspect or extend the defaults
-print(DEFAULT_OPTIMIZER_PROMPT)
-
-report = project.train(
-    optimizer_kwargs={
-        "optimizer_prompt": my_custom_optimizer_prompt,
-        "consolidation_prompt": my_custom_consolidation_prompt,
-    },
-)
-```
-
----
-
-### Context retrieval (RAG / web search hook)
-
-Inject external context before each inference call by providing a `context_retriever`. The callable receives the query text and the LLM client, and returns a string that is prepended to the user message as `<retrieved_context>`:
-
-```python
-def my_retriever(query: str, llm) -> str:
-    # query is the best available text representation of the input
-    results = my_vector_store.search(query, top_k=3)
-    return "\n\n".join(r.text for r in results)
-
-agent = project.get_inference_agent(context_retriever=my_retriever)
-result = agent.run(input_file="document.pdf")
-```
-
-### Built-in: WebSearchRetriever
-
-A ready-to-use retriever that fetches live web results. Supports DuckDuckGo (free, no key) and Tavily (best quality for RAG, free tier available):
-
-```python
-from prompt_forge import WebSearchRetriever, TrainingConfig
-
-# DuckDuckGo — free, no API key
-# pip install "prompt-forge[duckduckgo]"
-retriever = WebSearchRetriever(provider="duckduckgo", num_results=3)
-
-# Tavily — better quality, free tier available
-# pip install "prompt-forge[tavily]"
-retriever = WebSearchRetriever(provider="tavily", api_key="tvly-...", num_results=3)
-
-# Optional: rewrite_query=True uses the LLM to distil a focused search query
-# from the raw input before searching — recommended for long document inputs
-retriever = WebSearchRetriever(provider="tavily", api_key="tvly-...", rewrite_query=True)
-
-agent = project.get_inference_agent(context_retriever=retriever)
-report = project.train(
-    train_bundles,
-    val_bundles=val_bundles,
-    config=TrainingConfig(context_retriever=retriever),  # same retriever in eval
-)
-```
-
-The retriever can also call back into the LLM client for query rewriting or re-ranking:
-
-```python
-def rewriting_retriever(query: str, llm) -> str:
-    # Use a cheap model call to turn the raw input into a focused search query
-    rewrite_resp = llm.complete([
-        LLMMessage(role="system", content="Extract a short search query from this input."),
-        LLMMessage(role="user", content=query[:2000]),
-    ])
-    hits = my_vector_store.search(rewrite_resp.text.strip(), top_k=5)
-    return "\n\n".join(h.text for h in hits)
-```
-
-If the retriever raises, the error is logged as a warning and inference continues without retrieved context — the retriever never blocks the main call.
-
-> **Important:** if your production agent uses a context retriever, pass the same retriever to the training loop via `TrainingConfig(context_retriever=...)`. Without it, the eval agent sees a different input distribution than production and the training signal is misleading.
-
-```python
-report = project.train(
-    train_bundles,
-    val_bundles=val_bundles,
-    config=TrainingConfig(context_retriever=my_retriever),
-)
-```
-
----
-
-### Prompt consolidation
-
-After many iterations the optimizer accumulates rules and the prompt grows. When you decide it has become unwieldy, call `consolidate()` explicitly to merge redundant and overlapping rules while preserving all distinct coverage:
-
-```python
-# After a training run, compress the latest prompt
-project.consolidate()
-
-# Or consolidate a specific version
-project.consolidate(version=5)
-
-# Then continue training from the consolidated baseline
-report = project.train(train_bundles, val_bundles=val_bundles, config=config)
-```
-
-Consolidation saves the result as a new prompt version with a `[CONSOLIDATION]` entry in the training log, so the history stays complete and auditable. It is never triggered automatically — the decision is always yours.
-
----
-
-### Evaluation strategies
-
-```python
-# Field-by-field JSON comparison — ideal for data extraction.
-# Includes fuzzy matching: dates are normalised across formats,
-# numbers tolerate minor floating-point differences, and a configurable
-# numeric_tolerance handles rounding variation.
-project.train(eval_strategy="json_fields")
-
-# Token F1 similarity — robust to word order, good for free-text tasks
-project.train(eval_strategy="similarity")
-
-# LLM-as-judge — most flexible
-project.train(eval_strategy="llm_judge")
-
-# Exact string match
-project.train(eval_strategy="exact_match")
-
-# Skip evaluation — always accept new prompt (faster, less controlled)
-project.train(eval_strategy="none")
-
-# Custom evaluator
-from prompt_forge import Evaluator, EvalResult
-
-class MyEvaluator(Evaluator):
-    def evaluate(self, actual: str, expected: str, **kwargs) -> EvalResult:
-        score = my_comparison(actual, expected)
-        return EvalResult(score=score, passed=score > 0.8)
-
-project.train(eval_strategy=MyEvaluator())
-```
-
-`SimilarityEvaluator` supports three methods:
-
-```python
-from prompt_forge import SimilarityEvaluator
-
-# Default: token F1 (ROUGE-1) — no dependencies, good for free-text
-project.train(eval_strategy=SimilarityEvaluator(method="token"))
-
-# Character-level difflib — only useful when exact character fidelity matters
-project.train(eval_strategy=SimilarityEvaluator(method="char"))
-
-# Semantic cosine similarity — best quality, requires an embedding function
-embed = lambda text: my_embedding_model.encode(text).tolist()
-project.train(eval_strategy=SimilarityEvaluator(method="embedding", embed_fn=embed))
-```
-
----
-
-### Train / validation split
-
-Use `train_val_split` to create a reproducible split before training. Pass the val set explicitly so you control exactly which examples are used for scoring:
-
-```python
-from prompt_forge import train_val_split, TrainingConfig
-
-train_bundles, val_bundles = train_val_split(
-    project.bundles,
-    val_ratio=0.2,   # 20% held out for evaluation
-    seed=42,         # reproducible across runs
-)
-
-# Or fix the exact number of val examples:
-train_bundles, val_bundles = train_val_split(project.bundles, val_size=10, seed=42)
-
-report = project.train(
-    train_bundles,
-    val_bundles=val_bundles,
-    config=TrainingConfig(batch_size=5),
-)
-```
-
-Pass both `train_bundles` and `val_bundles` so the optimizer only sees training examples while scoring uses the held-out set. Omitting `train_bundles` falls back to all loaded examples.
-
-> **Note:** if `val_bundles` is not provided, the evaluator is skipped and `min_improvement` / `patience` have no effect — all `max_iterations` will run.
-
-#### Train / validation / test split
-
-For an unbiased final score, hold out a test set before training and evaluate it once at the end — exactly as you would with scikit-learn:
-
-```python
-from prompt_forge import train_val_split
-from prompt_forge.evaluation.evaluator import JsonFieldEvaluator
-
-# 1. Carve out the test set first — never seen during training or model selection
-train_val, test = train_val_split(project.bundles, val_ratio=0.2, seed=42)
-
-# 2. Split the remainder into train and val
-train, val = train_val_split(train_val, val_ratio=0.2, seed=42)
-
-# 3. Train — val drives early stopping and version selection
-report = project.train(train, val_bundles=val, config=TrainingConfig(batch_size=5))
-
-# 4. Evaluate the best version on the held-out test set
-evaluator = JsonFieldEvaluator()
-agent = project.get_inference_agent(version=report.final_version)
-test_results = evaluator.evaluate_batch([
-    (b.bundle_id, agent.run_bundle(b), b.load_contents()["expected_output"].text)
-    for b in test
-])
-print(f"Test score: {test_results.score:.3f}")
-```
-
----
-
-### Batch selection strategies
-
-```python
-from prompt_forge import FailurePriorityBatchStrategy
-
-# Focus on examples the current prompt fails on
-project.train(batch_strategy=FailurePriorityBatchStrategy())
-```
-
----
-
-### Prompt versioning
-
-```python
-# List all versions
-for v in project.list_versions():
-    print(f"v{v.version}: score={v.eval_score:.2f}  {v.training_log_entry[:80]}")
-
-# Get a specific version
-v3 = project.get_prompt(version=3)
-print(v3.prompt_text)
-print(v3.output_schema)   # JSON schema if applicable
-
-# Deploy a specific version
-agent = project.get_inference_agent(version=3)
-```
-
----
-
-### Storage backends
-
-```python
-from prompt_forge import Project, SQLAlchemyStore
-
-# Filesystem (default) — JSON files, human-readable, git-friendly
-project = Project("my_project", llm=llm)
-
-# Any SQL database via SQLAlchemy
-# Requires: pip install "prompt-forge[sqlalchemy]"
-# Plus the relevant DB driver, e.g. psycopg2, pyodbc, etc.
-
-# PostgreSQL
-project = Project("my_project", llm=llm,
-    store=SQLAlchemyStore("postgresql+psycopg2://user:pass@host/db"))
-
-# Azure SQL Server
-project = Project("my_project", llm=llm,
-    store=SQLAlchemyStore(
-        "mssql+pyodbc://user:pass@server.database.windows.net/db"
-        "?driver=ODBC+Driver+18+for+SQL+Server"
-    ))
-
-# SQLite file (single-file alternative to the default JSON layout)
-project = Project("my_project", llm=llm,
-    store=SQLAlchemyStore("sqlite:///./my_project/prompts.db"))
-
-# Multiple projects sharing the same database — namespaced by project_name
-store = SQLAlchemyStore("postgresql+psycopg2://user:pass@host/db", project_name="invoice_extraction")
-project = Project("invoice_extraction", llm=llm, store=store)
-```
-
----
-
-### Custom file loaders
-
-```python
-from prompt_forge import get_default_loader
-
-loader = get_default_loader()
-
-def load_parquet(path) -> str:
-    import pandas as pd
-    return pd.read_parquet(path).to_string()
-
-loader.register(".parquet", load_parquet)
-project = Project("my_project", llm=llm, file_loader=loader)
-```
-
-Supported out of the box: `.txt`, `.md`, `.json`, `.csv`, `.pdf`, `.xlsx`, `.xls`, `.docx`.
-
----
-
-### Training callbacks and multi-file examples
-
-```python
-def on_iteration(result):
-    print(f"[Iter {result.iteration}] "
-          f"{result.score_before:.3f} → {result.score_after:.3f} "
-          f"{'✓ IMPROVED' if result.improved else '✗'}")
-    print(f"  Learned: {result.learnings[:200]}")
-
-# Multi-file examples: CSV data + template → specification document
-project.set_bundle_schema(
-    input_data=".csv",
-    template=".docx",
-    expected_output=".docx",
-)
-
-# Custom inference function for complex pipelines
-def my_inference(prompt_text: str, bundle) -> str:
-    contents = bundle.load_contents()
-    input_text = preprocess(contents["input_data"].text)
-    return call_my_pipeline(prompt_text, input_text)
-
-project.train(
-    config=TrainingConfig(batch_size=5, max_iterations=20),
-    on_iteration=on_iteration,
-    inference_fn=my_inference,
-)
-```
-
----
-
-### Variable-length file bundles (variadic roles)
-
-Some tasks have a fixed "main" file plus a variable number of attachments — e.g. an e-mail with N PDF attachments, or a product sheet with N reference images. Mark those roles as `variadic`:
-
-```python
-project.set_bundle_schema(
-    mail=".txt",
-    attachments=".pdf",
-    expected_output=".json",
-    variadic=["attachments"],   # 0..N files allowed for this role
-)
-```
-
-Directory layout — all files whose name starts with the role are collected:
-
-```
-training_data/
-    example_001/
-        mail.txt
-        attachments_1.pdf
-        attachments_2.pdf
-        attachments_3.pdf
-        expected_output.json
-    example_002/
-        mail.txt
-        # no attachments — that's fine for a variadic role
-        expected_output.json
-```
-
-With `native_files=True` (the default) each file is passed as a separate `FilePart` inside the same XML tags. In text-extraction mode (`native_files=False`, requires an explicit `file_loader`), all files for a variadic role are concatenated into a single `<role>…</role>` block.
+- **Iterative optimization** — batch-based training loop with early stopping and full prompt version history
+- **Structured JSON output** — schema-aware prompts with automatic JSON parsing at inference time
+- **Flexible evaluation** — exact match, JSON field comparison, token F1, embedding similarity, LLM-as-judge, or custom
+- **Batch inference** — true single-call batching with chunking, concurrent fallback for file inputs
+- **Context retrieval** — RAG / web search hook (`context_retriever`) with built-in `WebSearchRetriever`
+- **LLM caching** — `CachedLLM` wrapper for zero-cost repeated calls during development
+- **Prompt consolidation** — explicit compression of accumulated rules when the prompt grows unwieldy
+- **Retry & resilience** — exponential backoff on all LLM calls, configurable per component
+- **Storage backends** — filesystem (default, git-friendly) or any SQL database via SQLAlchemy
+- **Provider-agnostic** — implement one `complete()` method to use any LLM
 
 ---
 
@@ -785,29 +101,22 @@ With `native_files=True` (the default) each file is passed as a separate `FilePa
 
 ```
 prompt_forge/
-├── __init__.py              # Public API
 ├── project.py               # Project — main entry point
 ├── bundle.py                # ExampleBundle, BundleSchema, BundleCollection
-├── utils.py                 # train_val_split and other helpers
-├── _retry.py                # call_with_retry — exponential backoff used across all LLM calls
 ├── caching.py               # CachedLLM — transparent response cache wrapper
 ├── retrievers.py            # WebSearchRetriever (DuckDuckGo, Tavily)
-├── llm/
-│   └── client.py            # LLMClient protocol (provider-agnostic)
-├── file_loaders/
-│   └── loader.py            # FileLoader with built-in + custom loaders
+├── utils.py                 # train_val_split and other helpers
+├── _retry.py                # Exponential backoff used across all LLM calls
+├── llm/client.py            # LLMClient protocol (provider-agnostic)
+├── file_loaders/loader.py   # FileLoader with built-in + custom loaders
 ├── training/
-│   ├── pipeline.py          # TrainingPipeline + TrainingReport
+│   ├── pipeline.py          # TrainingPipeline, TrainingConfig, TrainingReport
 │   ├── optimizer.py         # PromptOptimizer — the PE agent
-│   ├── prompt.py            # DEFAULT_OPTIMIZER_PROMPT, DEFAULT_CONSOLIDATION_PROMPT
 │   ├── batch_strategy.py    # Batch selection strategies
 │   └── training_log.py      # Compact training history
-├── inference/
-│   └── agent.py             # InferenceAgent — uses trained prompts
-├── evaluation/
-│   └── evaluator.py         # Evaluation strategies
-└── storage/
-    └── project_store.py     # FileSystemStore + SQLAlchemyStore backends
+├── inference/agent.py       # InferenceAgent — uses trained prompts
+├── evaluation/evaluator.py  # Evaluation strategies
+└── storage/project_store.py # FileSystemStore + SQLAlchemyStore
 ```
 
 ---

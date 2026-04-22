@@ -147,6 +147,29 @@ def test_retriever_receives_bundle_text(tmp_path):
     assert "hello world" in received[0]
 
 
+def test_retriever_receives_input_file_text(tmp_path):
+    p = tmp_path / "doc.txt"
+    p.write_text("document contents for retrieval")
+    received = []
+    llm = CapturingLLM()
+    retriever = lambda query, llm_client: received.append(query) or ""
+    agent = make_agent(llm, retriever=retriever)
+    agent.run(input_file=p)
+    assert "document contents for retrieval" in received[0]
+
+
+def test_retriever_receives_input_files_text(tmp_path):
+    (tmp_path / "a.txt").write_text("file A text")
+    (tmp_path / "b.txt").write_text("file B text")
+    received = []
+    llm = CapturingLLM()
+    retriever = lambda query, llm_client: received.append(query) or ""
+    agent = make_agent(llm, retriever=retriever)
+    agent.run(input_files={"role_a": tmp_path / "a.txt", "role_b": tmp_path / "b.txt"})
+    assert "file A text" in received[0]
+    assert "file B text" in received[0]
+
+
 # ── Retriever failure is silent ───────────────────────────────────────────────
 
 def test_retriever_exception_does_not_propagate():
