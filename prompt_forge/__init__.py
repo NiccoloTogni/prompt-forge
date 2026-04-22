@@ -42,6 +42,7 @@ from .training.batch_strategy import (
 )
 from .training.training_log import TrainingLog
 from .caching import CachedLLM
+from .retrievers import WebSearchRetriever
 from .evaluation.evaluator import (
     Evaluator,
     EvalResult,
@@ -56,6 +57,7 @@ __all__ = [
     "Project",
     "InferenceAgent",
     "CachedLLM",
+    "WebSearchRetriever",
     "train_val_split",
     # LLM
     "LLMClient",

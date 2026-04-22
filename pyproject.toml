@@ -16,7 +16,9 @@ dependencies = []  # Core has zero dependencies — LLM client is user-provided
 pdf        = ["pdfplumber>=0.10", "pytesseract>=0.3", "Pillow>=10.0"]
 excel      = ["openpyxl>=3.1"]
 docx       = ["python-docx>=1.0"]
-sqlalchemy = ["sqlalchemy>=2.0"]
+sqlalchemy  = ["sqlalchemy>=2.0"]
+duckduckgo  = ["duckduckgo-search>=6.0"]
+tavily      = ["tavily-python>=0.3"]
 all        = [
     "pdfplumber>=0.10",
     "pytesseract>=0.3",
@@ -24,6 +26,8 @@ all        = [
     "openpyxl>=3.1",
     "python-docx>=1.0",
     "sqlalchemy>=2.0",
+    "duckduckgo-search>=6.0",
+    "tavily-python>=0.3",
 ]
 app = ["streamlit>=1.36", "openai>=1.0"]
 dev = ["pytest>=7.0", "pytest-cov", "ruff"]

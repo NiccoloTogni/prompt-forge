@@ -427,6 +427,33 @@ agent = project.get_inference_agent(context_retriever=my_retriever)
 result = agent.run(input_file="document.pdf")
 ```
 
+### Built-in: WebSearchRetriever
+
+A ready-to-use retriever that fetches live web results. Supports DuckDuckGo (free, no key) and Tavily (best quality for RAG, free tier available):
+
+```python
+from prompt_forge import WebSearchRetriever, TrainingConfig
+
+# DuckDuckGo — free, no API key
+# pip install "prompt-forge[duckduckgo]"
+retriever = WebSearchRetriever(provider="duckduckgo", num_results=3)
+
+# Tavily — better quality, free tier available
+# pip install "prompt-forge[tavily]"
+retriever = WebSearchRetriever(provider="tavily", api_key="tvly-...", num_results=3)
+
+# Optional: rewrite_query=True uses the LLM to distil a focused search query
+# from the raw input before searching — recommended for long document inputs
+retriever = WebSearchRetriever(provider="tavily", api_key="tvly-...", rewrite_query=True)
+
+agent = project.get_inference_agent(context_retriever=retriever)
+report = project.train(
+    train_bundles,
+    val_bundles=val_bundles,
+    config=TrainingConfig(context_retriever=retriever),  # same retriever in eval
+)
+```
+
 The retriever can also call back into the LLM client for query rewriting or re-ranking:
 
 ```python
@@ -708,6 +735,7 @@ prompt_forge/
 ├── utils.py                 # train_val_split and other helpers
 ├── _retry.py                # call_with_retry — exponential backoff used across all LLM calls
 ├── caching.py               # CachedLLM — transparent response cache wrapper
+├── retrievers.py            # WebSearchRetriever (DuckDuckGo, Tavily)
 ├── llm/
 │   └── client.py            # LLMClient protocol (provider-agnostic)
 ├── file_loaders/
