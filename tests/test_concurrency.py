@@ -165,3 +165,7 @@ def test_training_config_max_workers_default():
 
 def test_training_config_max_workers_set():
     assert TrainingConfig(max_workers=8).max_workers == 8
+
+
+def test_training_config_eval_train_default():
+    assert TrainingConfig().eval_train is False

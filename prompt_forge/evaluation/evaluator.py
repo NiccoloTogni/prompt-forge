@@ -45,7 +45,13 @@ class BatchEvalResult:
     mean_score: float
     pass_rate: float
     individual_results: list[EvalResult]
-    failed_examples: list[dict]  # Bundle IDs + feedback for failures
+    example_ids: list[str]           # Parallel to individual_results — bundle_id per example
+    failed_examples: list[dict]      # Bundle IDs + feedback for failures only
+
+    @property
+    def example_scores(self) -> dict[str, float]:
+        """Mapping of bundle_id → score for every evaluated example."""
+        return dict(zip(self.example_ids, (r.score for r in self.individual_results)))
 
     def to_dict(self) -> dict:
         return {
@@ -53,6 +59,7 @@ class BatchEvalResult:
             "pass_rate": self.pass_rate,
             "num_examples": len(self.individual_results),
             "num_passed": sum(1 for r in self.individual_results if r.passed),
+            "example_scores": self.example_scores,
             "failed_examples": self.failed_examples,
         }
 
@@ -80,10 +87,12 @@ class Evaluator(ABC):
     ) -> BatchEvalResult:
         """Evaluate a batch of results."""
         individual = []
+        example_ids = []
         failed = []
         for bundle_id, actual, expected in results:
             result = self.evaluate(actual, expected)
             individual.append(result)
+            example_ids.append(bundle_id)
             if not result.passed:
                 failed.append({
                     "bundle_id": bundle_id,
@@ -96,6 +105,7 @@ class Evaluator(ABC):
             mean_score=sum(scores) / len(scores) if scores else 0.0,
             pass_rate=sum(1 for r in individual if r.passed) / len(individual) if individual else 0.0,
             individual_results=individual,
+            example_ids=example_ids,
             failed_examples=failed,
         )
 

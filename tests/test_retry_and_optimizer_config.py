@@ -131,6 +131,7 @@ def test_training_config_retry_defaults():
     assert config.max_retries == 3
     assert config.retry_delay == 1.0
     assert not hasattr(config, "optimizer_temperature")
+    assert config.eval_train is False
 
 
 def test_training_config_custom_retry():

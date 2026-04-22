@@ -245,6 +245,12 @@ for r in report:
 if report.refinement_recommended:
     score_str = f"{report.final_score:.2f}" if report.final_score is not None else "unknown"
     print(f"Score {score_str} — consider reviewing and editing the prompt manually")
+
+# Summarise recurring gaps the optimizer couldn't resolve — tells you what
+# training data to add before the next run (one cheap LLM call)
+summary = report.aggregate_issues(llm)
+if summary:
+    print("\nRecurring issues:\n", summary)
 ```
 
 ### 5. Run inference
@@ -332,6 +338,29 @@ Set a `seed` to make batch selection deterministic across runs:
 report = project.train(
     config=TrainingConfig(seed=42),
 )
+```
+
+---
+
+### Train score (optional, off by default)
+
+Per-example val scores (`bundle_id → score`) are always available when an evaluator is set. Train-batch scores require opting in via `eval_train=True` (costs extra tokens — disabled by default):
+
+```python
+report = project.train(
+    train_bundles, val_bundles=val_bundles,
+    config=TrainingConfig(eval_train=True),
+)
+
+for r in report:
+    train = f"{r.train_score:.3f}" if r.train_score is not None else "—"
+    val   = f"{r.score_after:.3f}"  if r.score_after  is not None else "—"
+    print(f"Iter {r.iteration}: train={train}  val={val}")
+
+    # Per-example breakdown — useful for spotting regressions
+    if r.val_example_scores:
+        for bundle_id, score in sorted(r.val_example_scores.items()):
+            print(f"  {bundle_id}: {score:.3f}")
 ```
 
 ---
@@ -576,6 +605,33 @@ report = project.train(
 Pass both `train_bundles` and `val_bundles` so the optimizer only sees training examples while scoring uses the held-out set. Omitting `train_bundles` falls back to all loaded examples.
 
 > **Note:** if `val_bundles` is not provided, the evaluator is skipped and `min_improvement` / `patience` have no effect — all `max_iterations` will run.
+
+#### Train / validation / test split
+
+For an unbiased final score, hold out a test set before training and evaluate it once at the end — exactly as you would with scikit-learn:
+
+```python
+from prompt_forge import train_val_split
+from prompt_forge.evaluation.evaluator import JsonFieldEvaluator
+
+# 1. Carve out the test set first — never seen during training or model selection
+train_val, test = train_val_split(project.bundles, val_ratio=0.2, seed=42)
+
+# 2. Split the remainder into train and val
+train, val = train_val_split(train_val, val_ratio=0.2, seed=42)
+
+# 3. Train — val drives early stopping and version selection
+report = project.train(train, val_bundles=val, config=TrainingConfig(batch_size=5))
+
+# 4. Evaluate the best version on the held-out test set
+evaluator = JsonFieldEvaluator()
+agent = project.get_inference_agent(version=report.final_version)
+test_results = evaluator.evaluate_batch([
+    (b.bundle_id, agent.run_bundle(b), b.load_contents()["expected_output"].text)
+    for b in test
+])
+print(f"Test score: {test_results.score:.3f}")
+```
 
 ---
 

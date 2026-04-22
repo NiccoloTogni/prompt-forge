@@ -17,7 +17,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from ..llm.client import LLMClient
+from ..llm.client import LLMClient, LLMMessage
 from ..bundle import BundleCollection, ExampleBundle
 from ..file_loaders import FileLoader, get_default_loader
 from ..storage.project_store import ProjectStore, PromptVersion
@@ -59,6 +59,7 @@ class TrainingConfig:
     retry_delay: float = 1.0             # Initial retry wait in seconds (doubles each attempt)
     max_workers: int | None = None       # Concurrent LLM calls for per-input batch fallback (None = serial)
     context_retriever: "Callable[[str, Any], str] | None" = None  # Retriever used by the eval agent — must match production
+    eval_train: bool = False             # Also evaluate the new prompt on the training batch (costs extra tokens)
 
 
 @dataclasses.dataclass
@@ -72,7 +73,10 @@ class IterationResult:
     learnings: str
     issues: str       # Outstanding gaps/contradictions flagged by the optimizer
     batch_ids: list[str]
-    tokens_used: int | None = None  # Total tokens consumed in this iteration (optimizer + eval)
+    train_score: float | None = None                    # Score on training batch (only when TrainingConfig.eval_train=True)
+    val_example_scores: dict[str, float] | None = None  # Per-example val scores: bundle_id → score
+    train_example_scores: dict[str, float] | None = None  # Per-example train scores (eval_train=True only)
+    tokens_used: int | None = None                      # Total tokens consumed in this iteration (optimizer + eval)
 
 
 @dataclasses.dataclass
@@ -97,6 +101,47 @@ class TrainingReport:
             for r in self.iterations
             if r.issues
         ]
+
+    def aggregate_issues(self, llm: "Any") -> str:
+        """
+        Summarise recurring issues across all training iterations using one LLM call.
+
+        Identifies distinct root causes and ranks them by how often they appeared,
+        giving a direct signal of what the training data is missing coverage for.
+        Returns an empty string if no issues were recorded.
+
+        Args:
+            llm: Any LLMClient — the same client used for training is fine.
+
+        Returns:
+            A concise bullet-point summary of recurring root causes, or ``""``
+            if no issues were flagged during training.
+        """
+        issues = self.all_issues
+        if not issues:
+            return ""
+
+        issues_text = "\n\n".join(
+            f"[Iteration {iteration}]\n{text}" for iteration, text in issues
+        )
+        messages = [
+            LLMMessage(
+                role="system",
+                content=(
+                    "You are a training analyst. The user will give you a list of issues "
+                    "flagged by a prompt optimizer across multiple training iterations. "
+                    "Identify the distinct recurring root causes and present them as a "
+                    "concise bullet-point list ranked by frequency (most recurring first). "
+                    "Merge semantically identical issues. Be specific and actionable — "
+                    "each bullet should clearly describe what training data is missing "
+                    "or what gap remains unresolved."
+                ),
+            ),
+            LLMMessage(role="user", content=issues_text),
+        ]
+        from .._retry import call_with_retry
+        response = call_with_retry(lambda: llm.complete(messages), max_retries=2, delay=1.0)
+        return response.text.strip()
 
     def __iter__(self):
         return iter(self.iterations)
@@ -313,6 +358,15 @@ class TrainingPipeline:
                 # No evaluator — always accept and run all iterations
                 improved = True
 
+            # 4b. Evaluate new prompt on training batch (optional, disabled by default)
+            train_score = None
+            train_example_scores = None
+            if config.eval_train and self.evaluator is not None and improved:
+                train_eval = self._evaluate_prompt(opt_result.new_prompt, batch, config.val_max_tokens)
+                train_score = train_eval.mean_score
+                train_example_scores = train_eval.example_scores
+                logger.info(f"Train score: {train_score:.3f}  Val score: {score_after:.3f}")
+
             # 5. Accept or reject
             if improved:
                 current_version += 1
@@ -363,6 +417,9 @@ class TrainingPipeline:
                 prompt_version=current_version,
                 score_before=score_before,
                 score_after=score_after,
+                train_score=train_score,
+                val_example_scores=new_eval_result.example_scores if new_eval_result is not None else None,
+                train_example_scores=train_example_scores,
                 improved=improved,
                 learnings=opt_result.learnings,
                 issues=opt_result.issues,
