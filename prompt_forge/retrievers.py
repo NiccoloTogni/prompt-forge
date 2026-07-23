@@ -6,9 +6,9 @@ passed directly as a context_retriever or used as a starting point for custom lo
 
 Supported providers
 -------------------
-- ``"duckduckgo"``  — free, no API key (pip install "prompt-forge[duckduckgo]")
+- ``"duckduckgo"``  — free, no API key (pip install "prompt-forge-ml[duckduckgo]")
 - ``"tavily"``      — best quality for RAG, free tier available
-                      (pip install "prompt-forge[tavily]")
+                      (pip install "prompt-forge-ml[tavily]")
 
 Optional: query rewriting
 -------------------------
@@ -123,7 +123,7 @@ class WebSearchRetriever:
         except ImportError:
             raise ImportError(
                 'duckduckgo-search is required for provider="duckduckgo". '
-                'Install it with: pip install "prompt-forge[duckduckgo]"'
+                'Install it with: pip install "prompt-forge-ml[duckduckgo]"'
             )
         results = list(DDGS().text(query, max_results=self.num_results))
         return _format_results(results, title_key="title", url_key="href", snippet_key="body")
@@ -136,7 +136,7 @@ class WebSearchRetriever:
         except ImportError:
             raise ImportError(
                 'tavily-python is required for provider="tavily". '
-                'Install it with: pip install "prompt-forge[tavily]"'
+                'Install it with: pip install "prompt-forge-ml[tavily]"'
             )
         client = TavilyClient(api_key=self.api_key)
         resp = client.search(query, max_results=self.num_results)

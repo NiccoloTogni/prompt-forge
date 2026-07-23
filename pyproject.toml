@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "prompt-forge"
+name = "prompt-forge-ml"
 version = "0.1.0"
 description = "Iterative, example-based prompt optimization — no fine-tuning required"
 readme = "README.md"

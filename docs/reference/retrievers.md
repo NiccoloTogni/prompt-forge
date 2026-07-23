@@ -53,7 +53,7 @@ WebSearchRetriever(
 #### DuckDuckGo (free, no key required)
 
 ```bash
-pip install "prompt-forge[duckduckgo]"
+pip install "prompt-forge-ml[duckduckgo]"
 ```
 
 ```python
@@ -65,7 +65,7 @@ No account or API key needed. Rate limits apply for high-volume usage.
 #### Tavily (best quality, free tier available)
 
 ```bash
-pip install "prompt-forge[tavily]"
+pip install "prompt-forge-ml[tavily]"
 ```
 
 ```python

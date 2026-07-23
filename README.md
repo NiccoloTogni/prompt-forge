@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/NiccoloTogni/prompt-forge/actions/workflows/ci.yml"><img src="https://github.com/NiccoloTogni/prompt-forge/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
-  <a href="https://pypi.org/project/prompt-forge/"><img src="https://img.shields.io/pypi/v/prompt-forge" alt="PyPI"/></a>
+  <a href="https://pypi.org/project/prompt-forge-ml/"><img src="https://img.shields.io/pypi/v/prompt-forge-ml" alt="PyPI"/></a>
   <a href="https://github.com/NiccoloTogni/prompt-forge/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"/></a>
 </p>
 
@@ -46,18 +46,20 @@ Traditional approaches to making LLMs perform complex tasks:
 ## Installation
 
 ```bash
-pip install prompt-forge
+pip install prompt-forge-ml
 
 # Optional extras
-pip install "prompt-forge[pdf]"         # PDF loading (pdfplumber + OCR)
-pip install "prompt-forge[sqlalchemy]"  # SQL storage backend
-pip install "prompt-forge[all]"         # everything
+pip install "prompt-forge-ml[pdf]"         # PDF loading (pdfplumber + OCR)
+pip install "prompt-forge-ml[sqlalchemy]"  # SQL storage backend
+pip install "prompt-forge-ml[all]"         # everything
 
 # Latest from source
 pip install git+https://github.com/NiccoloTogni/prompt-forge.git
 ```
 
 Supported file extras: `pdf`, `excel`, `docx`. Storage: `sqlalchemy`. Search: `duckduckgo`, `tavily`. Web UI: `app`.
+
+> The PyPI distribution is `prompt-forge-ml` (the unsuffixed name is taken on PyPI); the import is `import prompt_forge`.
 
 ---
 

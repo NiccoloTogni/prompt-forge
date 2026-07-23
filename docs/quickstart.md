@@ -9,9 +9,13 @@ This guide walks you from zero to a trained prompt. We use invoice field extract
 ## Install
 
 ```bash
-pip install git+https://github.com/NiccoloTogni/prompt-forge.git
-pip install "prompt-forge[pdf] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+pip install "prompt-forge-ml[pdf]"
+
+# or the latest from source:
+pip install "prompt-forge-ml[pdf] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
 ```
+
+> The distribution is named `prompt-forge-ml`; the import stays `import prompt_forge`.
 
 ---
 

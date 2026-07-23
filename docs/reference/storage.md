@@ -127,7 +127,7 @@ store = SQLAlchemyStore("sqlite://")
 Requires the `sqlalchemy` extra:
 
 ```bash
-pip install "prompt-forge[sqlalchemy]"
+pip install "prompt-forge-ml[sqlalchemy]"
 ```
 
 ### Constructor

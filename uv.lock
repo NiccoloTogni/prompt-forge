@@ -1422,7 +1422,7 @@ wheels = [
 ]
 
 [[package]]
-name = "prompt-forge"
+name = "prompt-forge-ml"
 version = "0.1.0"
 source = { editable = "." }
 

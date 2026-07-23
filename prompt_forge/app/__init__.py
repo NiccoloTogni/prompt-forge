@@ -1,7 +1,7 @@
 """PromptForge web UI — powered by Streamlit.
 
 Install:
-    pip install prompt-forge[app]
+    pip install prompt-forge-ml[app]
 
 Run:
     prompt-forge-ui
@@ -26,7 +26,7 @@ def run() -> None:
     except ImportError:
         print(
             "Streamlit is not installed. Run:\n"
-            "    pip install prompt-forge[app]"
+            "    pip install prompt-forge-ml[app]"
         )
         sys.exit(1)
 

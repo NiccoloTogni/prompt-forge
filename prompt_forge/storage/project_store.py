@@ -123,7 +123,7 @@ class SQLAlchemyStore:
     Azure SQL Server, SQLite, and more — via a standard connection string.
 
     Requires the ``sqlalchemy`` extra:
-        pip install "prompt-forge[sqlalchemy]"
+        pip install "prompt-forge-ml[sqlalchemy]"
 
     Examples::
 
@@ -161,7 +161,7 @@ class SQLAlchemyStore:
         except ImportError:
             raise ImportError(
                 "SQLAlchemyStore requires sqlalchemy. "
-                'Install it with: pip install "prompt-forge[sqlalchemy]"'
+                'Install it with: pip install "prompt-forge-ml[sqlalchemy]"'
             )
 
         self._project_name = project_name
