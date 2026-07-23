@@ -74,8 +74,12 @@ notebooks/tests_/*
 
 # Projects
 .projects/*
+projects/*
 
 # Claude
 .claude/
+
+# local data
+__local__/
 
 !.gitkeep
