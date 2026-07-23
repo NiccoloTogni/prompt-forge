@@ -9,8 +9,35 @@ description = "Iterative, example-based prompt optimization — no fine-tuning r
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
+authors = [{name = "Niccolò Togni"}]
+keywords = [
+    "prompt-optimization",
+    "prompt-engineering",
+    "llm",
+    "information-extraction",
+    "document-extraction",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 
 dependencies = []  # Core has zero dependencies — LLM client is user-provided
+
+[project.urls]
+Homepage = "https://github.com/NiccoloTogni/prompt-forge"
+Repository = "https://github.com/NiccoloTogni/prompt-forge"
+Issues = "https://github.com/NiccoloTogni/prompt-forge/issues"
+Documentation = "https://github.com/NiccoloTogni/prompt-forge/tree/master/docs"
 
 [project.optional-dependencies]
 pdf        = ["pdfplumber>=0.10", "pytesseract>=0.3", "Pillow>=10.0"]

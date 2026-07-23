@@ -1,13 +1,19 @@
 <p align="center">
-  <img src="resources/promptforge-logo.png" width="500" alt="PromptForge logo"/>
+  <img src="https://raw.githubusercontent.com/NiccoloTogni/prompt-forge/master/resources/promptforge-logo.png" width="500" alt="PromptForge logo"/>
 </p>
 
 <p align="center"><em>Iterative, example-based prompt optimization — no fine-tuning required.</em></p>
 
 <p align="center">
-  <a href="docs/quickstart.md">Quickstart</a> ·
-  <a href="docs/concepts.md">Concepts</a> ·
-  <a href="docs/reference/">Reference</a>
+  <a href="https://github.com/NiccoloTogni/prompt-forge/blob/master/docs/quickstart.md">Quickstart</a> ·
+  <a href="https://github.com/NiccoloTogni/prompt-forge/blob/master/docs/concepts.md">Concepts</a> ·
+  <a href="https://github.com/NiccoloTogni/prompt-forge/tree/master/docs/reference">Reference</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/NiccoloTogni/prompt-forge/actions/workflows/ci.yml"><img src="https://github.com/NiccoloTogni/prompt-forge/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://pypi.org/project/prompt-forge/"><img src="https://img.shields.io/pypi/v/prompt-forge" alt="PyPI"/></a>
+  <a href="https://github.com/NiccoloTogni/prompt-forge/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"/></a>
 </p>
 
 ---
@@ -40,16 +46,18 @@ Traditional approaches to making LLMs perform complex tasks:
 ## Installation
 
 ```bash
-pip install git+https://github.com/NiccoloTogni/prompt-forge.git
+pip install prompt-forge
 
 # Optional extras
-pip install "prompt-forge[pdf]        @ git+https://github.com/NiccoloTogni/prompt-forge.git"
-pip install "prompt-forge[sqlalchemy] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
-pip install "prompt-forge[duckduckgo] @ git+https://github.com/NiccoloTogni/prompt-forge.git"
-pip install "prompt-forge[all]        @ git+https://github.com/NiccoloTogni/prompt-forge.git"
+pip install "prompt-forge[pdf]"         # PDF loading (pdfplumber + OCR)
+pip install "prompt-forge[sqlalchemy]"  # SQL storage backend
+pip install "prompt-forge[all]"         # everything
+
+# Latest from source
+pip install git+https://github.com/NiccoloTogni/prompt-forge.git
 ```
 
-Supported file extras: `pdf`, `excel`, `docx`. Storage: `sqlalchemy`. Search: `duckduckgo`, `tavily`.
+Supported file extras: `pdf`, `excel`, `docx`. Storage: `sqlalchemy`. Search: `duckduckgo`, `tavily`. Web UI: `app`.
 
 ---
 
@@ -85,7 +93,7 @@ agent = project.get_inference_agent()
 result = agent.run(input_file="new_invoice.pdf")
 ```
 
-See **[docs/quickstart.md](docs/quickstart.md)** for the full step-by-step guide.
+See **[docs/quickstart.md](https://github.com/NiccoloTogni/prompt-forge/blob/master/docs/quickstart.md)** for the full step-by-step guide.
 
 ---
 
