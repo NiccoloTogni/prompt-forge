@@ -26,7 +26,7 @@ from .bundle import BundleSchema, BundleCollection, ExampleBundle
 from .storage.project_store import FileSystemStore, ProjectStore, PromptVersion
 from .training.pipeline import TrainingPipeline, TrainingConfig, TrainingReport
 from .training.optimizer import PromptOptimizer
-from .training.batch_strategy import BatchStrategy, RandomBatchStrategy
+from .training.batch_strategy import BatchStrategy, RandomBatchStrategy, FailurePriorityBatchStrategy
 from .evaluation.evaluator import (
     Evaluator,
     ExactMatchEvaluator,
@@ -272,7 +272,10 @@ class Project:
                           ("exact_match", "json_fields", "similarity", "llm_judge", "none").
                           Pass None or "none" to disable evaluation — training always runs
                           max_iterations; min_improvement and patience are ignored.
-            batch_strategy: Batch selection strategy (default: RandomBatchStrategy).
+            batch_strategy: Batch selection strategy. Defaults to
+                            FailurePriorityBatchStrategy when an evaluator is
+                            active (rejected batches get retried), otherwise
+                            RandomBatchStrategy. Both are seeded with config.seed.
             inference_fn: Custom inference function ``(prompt_text, bundle) -> str``.
                           Defaults to an LLM call using the project's client.
             on_iteration: Optional callback called after each iteration with an
@@ -309,12 +312,20 @@ class Project:
             **_opt_kwargs,
         )
 
+        if batch_strategy is None:
+            # Mirror TrainingPipeline's default, but honour config.seed
+            batch_strategy = (
+                FailurePriorityBatchStrategy(seed=config.seed)
+                if evaluator is not None
+                else RandomBatchStrategy(seed=config.seed)
+            )
+
         pipeline = TrainingPipeline(
             llm=self.llm,
             store=self.store,
             evaluator=evaluator,
             optimizer=optimizer,
-            batch_strategy=batch_strategy or RandomBatchStrategy(seed=config.seed),
+            batch_strategy=batch_strategy,
             file_loader=self.file_loader,
             context=self._context,
             inference_fn=inference_fn,
@@ -328,7 +339,14 @@ class Project:
             config=config,
         )
 
-    def consolidate(self, version: int | None = None):
+    def consolidate(
+        self,
+        version: int | None = None,
+        *,
+        val_bundles=None,
+        eval_strategy: str | Evaluator | None = "llm_judge",
+        val_max_tokens: int | None = None,
+    ):
         """
         Compress the current (or specified) prompt by merging redundant rules.
 
@@ -336,8 +354,18 @@ class Project:
         training. Call when the prompt has grown unwieldy, then continue training
         from the consolidated baseline.
 
+        Consolidation is lossy: pass ``val_bundles`` to re-score the consolidated
+        prompt immediately and catch coverage loss. Without ``val_bundles`` the
+        new version inherits the source's ``eval_score``, which describes the
+        prompt *before* compression.
+
         Args:
             version: Prompt version to consolidate. Defaults to the latest.
+            val_bundles: Validation examples to re-score the consolidated prompt
+                         on — ideally the same set used during training.
+            eval_strategy: Evaluator used for re-scoring (same shortcuts as
+                           ``train``). Only used when val_bundles is passed.
+            val_max_tokens: Token budget per batch eval call.
 
         Returns:
             The new PromptVersion containing the consolidated prompt.
@@ -351,9 +379,15 @@ class Project:
         pipeline = TrainingPipeline(
             llm=self.llm,
             store=self.store,
+            evaluator=self._resolve_evaluator(eval_strategy) if val_bundles is not None else None,
             optimizer=optimizer,
+            file_loader=self.file_loader,
         )
-        return pipeline.consolidate(version=version)
+        return pipeline.consolidate(
+            version=version,
+            val_bundles=val_bundles,
+            val_max_tokens=val_max_tokens,
+        )
 
     # ── Inference ─────────────────────────────────────────────────────
 

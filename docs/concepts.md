@@ -129,6 +129,12 @@ The optimizer is naturally additive: each iteration appends new rules and edge c
 
 After consolidation, the compressed prompt is saved as a new version. Training continues from this baseline. The history stays complete — consolidation is just another version, not a history rewrite.
 
+Because it is lossy, **re-score it**: pass `val_bundles` to `consolidate()` and the compressed prompt is evaluated immediately — a score drop means the compression lost coverage (a warning is logged). Without `val_bundles`, the new version inherits the source's score, which describes the prompt *before* compression.
+
+```python
+version = project.consolidate(val_bundles=val, eval_strategy="json_fields")
+```
+
 When to consolidate: after a plateau of non-improving iterations, or when the prompt has grown to a length that makes you uncomfortable.
 
 ---

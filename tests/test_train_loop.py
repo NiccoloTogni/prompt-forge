@@ -310,3 +310,83 @@ def test_all_val_bundles_broken_raises(tmp_path):
             val_bundles=[val_broken],
             config=TrainingConfig(max_iterations=1, native_files=False),
         )
+
+
+# ── Default batch strategy ────────────────────────────────────────────────────
+
+def test_default_strategy_depends_on_evaluator(tmp_path):
+    from prompt_forge.training.batch_strategy import (
+        FailurePriorityBatchStrategy,
+        RandomBatchStrategy,
+    )
+
+    with_eval = TrainingPipeline(
+        llm=_make_llm(), store=_make_store(tmp_path / "a"), evaluator=ExactMatchEvaluator()
+    )
+    without_eval = TrainingPipeline(
+        llm=_make_llm(), store=_make_store(tmp_path / "b"), evaluator=None
+    )
+    assert isinstance(with_eval.batch_strategy, FailurePriorityBatchStrategy)
+    assert isinstance(without_eval.batch_strategy, RandomBatchStrategy)
+
+
+def test_failure_priority_prefers_unseen_without_failures():
+    from prompt_forge.training.batch_strategy import FailurePriorityBatchStrategy
+
+    bundles = [ExampleBundle(bundle_id=f"b{i}", files={}) for i in range(10)]
+    strat = FailurePriorityBatchStrategy(seed=0)
+    used = {f"b{i}" for i in range(5)}
+    batch = strat.select_batch(bundles, batch_size=5, used_ids=used, failed_ids=[])
+    # All 5 unseen bundles must be picked before any already-seen one
+    assert {b.bundle_id for b in batch} == {f"b{i}" for i in range(5, 10)}
+
+
+# ── Resume iteration numbering ────────────────────────────────────────────────
+
+def test_resumed_run_continues_iteration_numbering(tmp_path):
+    store = _make_store(tmp_path)
+    train_b = _make_bundle(tmp_path, "t", "in", "out")
+    val_b = _make_bundle(tmp_path, "v", "val in", "val out")
+    cfg = TrainingConfig(max_iterations=2, native_files=False, patience=10)
+
+    pipeline = TrainingPipeline(
+        llm=_make_llm(), store=store,
+        evaluator=ScriptedEvaluator([0.5]), file_loader=get_default_loader(),
+    )
+    r1 = pipeline.train([train_b], val_bundles=[val_b], config=cfg)
+    r2 = pipeline.train([train_b], val_bundles=[val_b], config=cfg)
+    assert [r.iteration for r in r1.iterations] == [1, 2]
+    assert [r.iteration for r in r2.iterations] == [3, 4]
+
+    # A fresh pipeline restoring state from the store must also continue
+    pipeline2 = TrainingPipeline(
+        llm=_make_llm(), store=store,
+        evaluator=ScriptedEvaluator([0.5]), file_loader=get_default_loader(),
+    )
+    r3 = pipeline2.train([train_b], val_bundles=[val_b], config=cfg)
+    assert r3.iterations[0].iteration == 5
+
+
+# ── Consolidation re-scoring ──────────────────────────────────────────────────
+
+def test_consolidate_rescores_with_val_bundles(tmp_path):
+    store = _make_store(tmp_path)
+    val_b = _make_bundle(tmp_path, "v", "val in", "val out")
+    pipeline = TrainingPipeline(
+        llm=_make_llm(), store=store,
+        evaluator=ScriptedEvaluator([0.7]), file_loader=get_default_loader(),
+    )
+    version = pipeline.consolidate(val_bundles=[val_b])
+    assert version.eval_score == 0.7
+    assert version.metadata["rescored"] is True
+    assert version.eval_details is not None
+
+
+def test_consolidate_without_val_keeps_source_score(tmp_path):
+    store = _make_store(tmp_path)  # seed version has eval_score=None
+    pipeline = TrainingPipeline(
+        llm=_make_llm(), store=store, evaluator=None, file_loader=get_default_loader(),
+    )
+    version = pipeline.consolidate()
+    assert version.eval_score is None
+    assert version.metadata["rescored"] is False

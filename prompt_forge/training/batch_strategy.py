@@ -29,7 +29,10 @@ class BatchStrategy(ABC):
             bundles: All available example bundles.
             batch_size: Number of examples to select.
             used_ids: IDs of bundles already used in previous iterations.
-            failed_ids: IDs of bundles that the current prompt gets wrong.
+            failed_ids: IDs from the training batch of the most recent rejected
+                        iteration — the candidate prompt learned from them did
+                        not improve the validation score, so they are worth
+                        retrying.
 
         Returns:
             List of selected ExampleBundles.
@@ -77,10 +80,12 @@ class RandomBatchStrategy(BatchStrategy):
 
 class FailurePriorityBatchStrategy(BatchStrategy):
     """
-    Prioritizes examples that the current prompt fails on.
+    Prioritizes examples from the last rejected iteration's batch.
 
-    Mixes failed examples with unseen examples to balance
-    fixing known issues with discovering new patterns.
+    Mixes them with unseen examples to balance fixing known issues with
+    discovering new patterns. With no failures pending it behaves like
+    RandomBatchStrategy (unseen first, then seen) — which makes it a safe
+    default whenever an evaluator is active.
     """
 
     def __init__(self, failure_ratio: float = 0.5, seed: int | None = None):
@@ -117,8 +122,11 @@ class FailurePriorityBatchStrategy(BatchStrategy):
         batch = self.rng.sample(failed, failure_slots) if failure_slots > 0 else []
 
         # Fill remaining with unseen first, then rest
-        pool = unseen + rest
-        if pool and remaining_slots > 0:
-            batch.extend(self.rng.sample(pool, min(remaining_slots, len(pool))))
+        take_unseen = min(remaining_slots, len(unseen))
+        if take_unseen > 0:
+            batch.extend(self.rng.sample(unseen, take_unseen))
+            remaining_slots -= take_unseen
+        if rest and remaining_slots > 0:
+            batch.extend(self.rng.sample(rest, min(remaining_slots, len(rest))))
 
         return batch

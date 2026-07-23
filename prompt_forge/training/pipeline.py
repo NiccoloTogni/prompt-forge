@@ -24,7 +24,7 @@ from ..storage.project_store import ProjectStore, PromptVersion
 from ..evaluation.evaluator import Evaluator, BatchEvalResult
 from ..inference.agent import InferenceAgent
 from .optimizer import PromptOptimizer
-from .batch_strategy import BatchStrategy, RandomBatchStrategy
+from .batch_strategy import BatchStrategy, RandomBatchStrategy, FailurePriorityBatchStrategy
 from .training_log import TrainingLog, LogEntry
 
 logger = logging.getLogger(__name__)
@@ -186,7 +186,10 @@ class TrainingPipeline:
             store: Storage backend for prompt versions and state.
             evaluator: Strategy for scoring outputs.
             optimizer: Custom prompt optimizer (default: PromptOptimizer with defaults).
-            batch_strategy: How to select batches (default: RandomBatchStrategy).
+            batch_strategy: How to select batches. Defaults to
+                            FailurePriorityBatchStrategy when an evaluator is set
+                            (so rejected batches actually get retried), otherwise
+                            RandomBatchStrategy.
             file_loader: File loader for reading example files.
             context: Domain context passed to the optimizer.
             inference_fn: Custom function to run inference with the prompt.
@@ -207,9 +210,16 @@ class TrainingPipeline:
             file_loader=self.file_loader,
             context=context,
         )
-        self.batch_strategy = batch_strategy or RandomBatchStrategy()
+        if batch_strategy is not None:
+            self.batch_strategy = batch_strategy
+        elif evaluator is not None:
+            # Failed batches are only retried if the strategy honours failed_ids
+            self.batch_strategy = FailurePriorityBatchStrategy()
+        else:
+            self.batch_strategy = RandomBatchStrategy()
         self.training_log = TrainingLog()
         self._total_tokens: int = 0  # Running token counter across the whole training run
+        self._eval_agent: InferenceAgent | None = None  # built by train(); consolidate() builds a default if needed
 
         # Restore state if available
         self._restore_state()
@@ -322,8 +332,17 @@ class TrainingPipeline:
             f"batch_size={config.batch_size}, max_iterations={config.max_iterations}"
         )
 
-        for iteration in range(1, config.max_iterations + 1):
-            logger.info(f"\n{'='*60}\nIteration {iteration}/{config.max_iterations}\n{'='*60}")
+        # Continue numbering from any restored training log, so a resumed run
+        # never produces duplicate iteration numbers in the history the
+        # optimizer sees. max_iterations counts iterations of THIS run.
+        _start_iteration = len(self.training_log.entries)
+
+        for offset in range(1, config.max_iterations + 1):
+            iteration = _start_iteration + offset
+            logger.info(
+                f"\n{'='*60}\nIteration {iteration} "
+                f"({offset}/{config.max_iterations} this run)\n{'='*60}"
+            )
 
             # 1. Select batch
             batch = self.batch_strategy.select_batch(
@@ -425,7 +444,7 @@ class TrainingPipeline:
                 self.store.save_prompt_version(version)
                 logger.info(f"Saved prompt version {current_version}")
             else:
-                _failed_batch_ids = batch_ids  # retry these with FailurePriorityBatchStrategy
+                _failed_batch_ids = batch_ids  # retried by FailurePriorityBatchStrategy (the default when an evaluator is set)
 
             # Patience counts iterations without a STRICT val improvement: a tie
             # can be accepted (min_improvement=0) but must not reset the counter,
@@ -520,7 +539,13 @@ class TrainingPipeline:
             total_tokens_used=self._total_tokens - _tokens_at_start,
         )
 
-    def consolidate(self, version: int | None = None) -> PromptVersion:
+    def consolidate(
+        self,
+        version: int | None = None,
+        *,
+        val_bundles: BundleCollection | list[ExampleBundle] | None = None,
+        val_max_tokens: int | None = None,
+    ) -> PromptVersion:
         """
         Compress the current (or specified) prompt by merging redundant rules.
 
@@ -531,8 +556,17 @@ class TrainingPipeline:
         The consolidated prompt is saved as a new version with a metadata flag
         so the history stays honest.
 
+        Consolidation is lossy: pass ``val_bundles`` (with an evaluator set on
+        the pipeline) to re-score the consolidated prompt immediately — a score
+        drop means the compression lost coverage. Without ``val_bundles`` the
+        new version inherits the source's ``eval_score``, which describes the
+        prompt *before* compression.
+
         Args:
             version: Prompt version to consolidate. Defaults to the latest.
+            val_bundles: Validation examples to re-score the consolidated
+                         prompt on (requires an evaluator).
+            val_max_tokens: Token budget per batch eval call (as in training).
 
         Returns:
             The new PromptVersion containing the consolidated prompt.
@@ -555,6 +589,43 @@ class TrainingPipeline:
         result = self.optimizer.consolidate(source.prompt_text)
         self._total_tokens += self._count_tokens(result.usage)
 
+        # Re-score the consolidated prompt when possible — consolidation is
+        # lossy, and inheriting the source's score would hide any coverage loss.
+        new_score = source.eval_score
+        eval_details = None
+        rescored = False
+        if val_bundles is not None and self.evaluator is not None:
+            _val_list = (
+                val_bundles.bundles
+                if isinstance(val_bundles, BundleCollection)
+                else list(val_bundles)
+            )
+            if _val_list:
+                if self._eval_agent is None:
+                    self._eval_agent = InferenceAgent(
+                        llm=self.llm,
+                        prompt_text="",  # set per evaluation call
+                        file_loader=self.file_loader,
+                        token_estimator=self.optimizer.token_estimator,
+                    )
+                eval_result = self._evaluate_prompt(result.new_prompt, _val_list, val_max_tokens)
+                new_score = eval_result.mean_score
+                eval_details = eval_result.to_dict()
+                rescored = True
+                if source.eval_score is not None and new_score < source.eval_score:
+                    logger.warning(
+                        f"Consolidation dropped the val score: "
+                        f"{source.eval_score:.3f} → {new_score:.3f}. "
+                        "Review the consolidated prompt before continuing."
+                    )
+                else:
+                    logger.info(f"Consolidated prompt re-scored: {new_score:.3f}")
+        elif val_bundles is not None:
+            logger.warning(
+                "val_bundles passed to consolidate() but no evaluator is set — "
+                "re-scoring skipped; the new version inherits the source's score."
+            )
+
         latest = self.store.get_latest_prompt()
         new_version_num = (latest.version if latest else 0) + 1
 
@@ -567,9 +638,14 @@ class TrainingPipeline:
                 f"[CONSOLIDATION] Compressed from v{source.version} "
                 f"({len(source.prompt_text):,} → {len(result.new_prompt):,} chars)"
             ),
-            eval_score=source.eval_score,
+            eval_score=new_score,
+            eval_details=eval_details,
             output_schema=source.output_schema,
-            metadata={"consolidation": True, "source_version": source.version},
+            metadata={
+                "consolidation": True,
+                "source_version": source.version,
+                "rescored": rescored,
+            },
         )
         self.store.save_prompt_version(consolidated)
         logger.info(
