@@ -80,7 +80,7 @@ class PromptOptimizer:
         self.token_estimator = token_estimator or (lambda text: len(text) // TOKEN_CHARS_PER_TOKEN)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self._detected_schema: dict | None = None  # cached after first successful detection
+        self._detected_schema: dict | None = None  # accumulated across batches — keys merged on every optimize() call
 
     def optimize(
         self,
@@ -113,10 +113,18 @@ class PromptOptimizer:
         """
         if output_schema is not None:
             resolved_schema = output_schema
-        elif self._detected_schema is not None:
-            resolved_schema = self._detected_schema
         else:
-            self._detected_schema = self._detect_output_schema(examples)
+            # Detect on every batch and merge keys into the accumulated schema:
+            # the first batch alone may not cover every field the task can
+            # produce, so the schema must not be frozen on first detection.
+            detected = self._detect_output_schema(examples)
+            if detected is not None:
+                if self._detected_schema is None:
+                    self._detected_schema = detected
+                else:
+                    props = self._detected_schema.setdefault("properties", {})
+                    for key, value_type in detected.get("properties", {}).items():
+                        props.setdefault(key, value_type)
             resolved_schema = self._detected_schema
 
         # Pre-render all examples once to avoid double file I/O

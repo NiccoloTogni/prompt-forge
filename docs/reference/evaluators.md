@@ -205,13 +205,18 @@ The LLM is prompted to return a JSON object:
 
 Useful when the expected output is fuzzy (natural language tasks, paraphrasing). Adds LLM cost per evaluation call — consider using `SimilarityEvaluator(method="token")` for cheaper approximate scoring.
 
+The judge runs at **temperature 0** by default: its score decides which prompt versions are accepted, so it must be as deterministic as the model allows. Consider passing a **different LLM** than the one used for inference — a model judging its own outputs is subject to self-preference bias.
+
 ### Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `llm` | required | LLM client for judging. |
+| `llm` | required | LLM client for judging. Can differ from the inference LLM (recommended). |
 | `pass_threshold` | `0.75` | Minimum score to count as passed. |
 | `task_description` | `""` | Optional context injected into the judge prompt. |
+| `temperature` | `0.0` | Sampling temperature for the judge call. `None` omits the kwarg. |
+| `max_retries` | `3` | Retries per failed judge LLM call (exponential backoff). |
+| `retry_delay` | `1.0` | Initial retry wait in seconds; doubles each attempt. |
 
 ---
 
@@ -261,5 +266,5 @@ Pass it to `TrainingPipeline(evaluator=RougeL())`.
 
 - **`pass_threshold`** controls `EvalResult.passed` and `BatchEvalResult.pass_rate`. The training pipeline uses `mean_score` for iteration comparison, not `pass_rate`, so the threshold does not affect which prompt versions are accepted.
 - **`JsonFieldEvaluator` with nested objects:** nested keys appear as dot-separated paths in feedback (e.g. `address.city`). Ignored via `ignore_fields` at any nesting level using the leaf key only (not the path).
-- **`LLMJudgeEvaluator` parsing failure:** if the LLM response cannot be parsed as JSON, score defaults to 0.0 and `feedback` contains the raw response prefix. This is rare but can happen with low-quality models — switch to a stronger model if you observe it frequently.
+- **`LLMJudgeEvaluator` parsing failure:** if the judge reply cannot be parsed as JSON, the evaluator re-asks once with a stricter formatting instruction. Only if the second reply is also unparsable does the score default to 0.0 (with the raw response prefix in `feedback`). If you observe this frequently, switch to a stronger judge model.
 - **Weighted field evaluation:** `JsonFieldEvaluator` weights all fields equally. If some fields matter more (e.g. `total_amount` is more important than `vendor_address`), implement a custom evaluator that weights scores per field.

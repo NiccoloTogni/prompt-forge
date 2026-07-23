@@ -20,6 +20,7 @@ from collections import Counter
 from datetime import datetime
 from typing import Any, Callable
 
+from .._retry import call_with_retry
 from ..llm.client import LLMClient, LLMMessage
 
 DEFAULT_PASS_THRESHOLD = 0.75
@@ -397,6 +398,11 @@ class LLMJudgeEvaluator(Evaluator):
     Uses an LLM to judge output quality by comparing actual vs expected.
 
     The LLM is prompted to score accuracy and explain discrepancies.
+
+    The judge call runs at temperature 0 by default — its score decides which
+    prompt versions are accepted, so it must be as deterministic as the model
+    allows. Consider passing a *different* LLM than the one used for inference:
+    a model judging its own outputs is subject to self-preference bias.
     """
 
     def __init__(
@@ -404,10 +410,27 @@ class LLMJudgeEvaluator(Evaluator):
         llm: LLMClient,
         pass_threshold: float = DEFAULT_PASS_THRESHOLD,
         task_description: str = "",
+        temperature: float | None = 0.0,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
     ):
+        """
+        Args:
+            llm: LLM client used for judging. Can (and often should) differ
+                 from the inference LLM to avoid self-preference bias.
+            pass_threshold: Scores at or above this count as passed.
+            task_description: Optional task context injected into the judge prompt.
+            temperature: Sampling temperature for the judge call. Defaults to
+                         0.0 for deterministic scoring; None omits the kwarg.
+            max_retries: Retries per failed judge LLM call (exponential backoff).
+            retry_delay: Initial retry wait in seconds (doubles each attempt).
+        """
         self.llm = llm
         self.pass_threshold = pass_threshold
         self.task_description = task_description
+        self.temperature = temperature
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
     def evaluate(self, actual: str, expected: str, **kwargs) -> EvalResult:
         judge_prompt = f"""You are evaluating the quality of an AI-generated output against the expected correct output.
@@ -433,28 +456,58 @@ Respond in this exact JSON format (no other text):
     "feedback": "brief overall assessment"
 }}"""
 
-        response = self.llm.complete(
-            messages=[LLMMessage(role="user", content=judge_prompt)],
-        )
+        response = self._call_judge(judge_prompt)
+        parsed = self._parse_judge_response(response.text)
 
-        try:
-            text = response.text.strip()
-            fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
-            if fence_match:
-                text = fence_match.group(1).strip()
-            result: dict = json.loads(text)
-            score = float(result.get("score", 0.0))
-            return EvalResult(
-                score=score,
-                passed=score >= self.pass_threshold,
-                details=result,
-                feedback=result.get("feedback", ""),
+        if parsed is None:
+            # Re-ask once with a stricter instruction — a format slip must not
+            # silently score the example as 0.
+            retry_prompt = (
+                judge_prompt
+                + "\n\nIMPORTANT: your previous reply could not be parsed. "
+                "Respond with ONLY the JSON object — no prose, no code fences."
             )
-        except (json.JSONDecodeError, KeyError, ValueError):
-            # Fallback: try to extract a score from the text
+            response = self._call_judge(retry_prompt)
+            parsed = self._parse_judge_response(response.text)
+
+        if parsed is None:
             return EvalResult(
                 score=0.0,
                 passed=False,
                 feedback=f"Judge response could not be parsed: {response.text[:200]}",
                 details={"raw_response": response.text},
             )
+
+        score, result = parsed
+        return EvalResult(
+            score=score,
+            passed=score >= self.pass_threshold,
+            details=result,
+            feedback=result.get("feedback", ""),
+        )
+
+    def _call_judge(self, prompt: str):
+        """One judge LLM call with retry/backoff, at the configured temperature."""
+        llm_kwargs = {} if self.temperature is None else {"temperature": self.temperature}
+        return call_with_retry(
+            lambda: self.llm.complete(
+                messages=[LLMMessage(role="user", content=prompt)],
+                **llm_kwargs,
+            ),
+            max_retries=self.max_retries,
+            delay=self.retry_delay,
+        )
+
+    @staticmethod
+    def _parse_judge_response(text: str) -> tuple[float, dict] | None:
+        """Extract (score, details) from the judge reply, or None if unparsable."""
+        text = text.strip()
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+        if fence_match:
+            text = fence_match.group(1).strip()
+        try:
+            result: dict = json.loads(text)
+            score = float(result.get("score", 0.0))
+        except (json.JSONDecodeError, AttributeError, TypeError, ValueError, KeyError):
+            return None
+        return score, result

@@ -404,3 +404,57 @@ class TestLLMJudgeEvaluator:
         r = ev.evaluate("a", "b")
         assert "score" in r.details
         assert "correct_aspects" in r.details
+
+
+# ── LLMJudgeEvaluator: retry & robustness ─────────────────────────────────────
+
+class TestLLMJudgeRetry:
+    def _judge_response(self, score=0.9):
+        return json.dumps({"score": score, "feedback": "ok"})
+
+    def test_transient_api_error_is_retried(self):
+        llm = MagicMock()
+        llm.complete.side_effect = [
+            RuntimeError("API down"),
+            MagicMock(text=self._judge_response(0.8), usage=None),
+        ]
+        ev = LLMJudgeEvaluator(llm=llm, retry_delay=0)
+        r = ev.evaluate("a", "b")
+        assert r.score == pytest.approx(0.8)
+        assert llm.complete.call_count == 2
+
+    def test_unparsable_reply_is_reasked_once(self):
+        llm = MagicMock()
+        llm.complete.side_effect = [
+            MagicMock(text="Sure! Here's my assessment: it's decent.", usage=None),
+            MagicMock(text=self._judge_response(0.6), usage=None),
+        ]
+        ev = LLMJudgeEvaluator(llm=llm, retry_delay=0)
+        r = ev.evaluate("a", "b")
+        assert r.score == pytest.approx(0.6)
+        assert llm.complete.call_count == 2
+        # The re-ask carries a stricter formatting instruction
+        second_prompt = llm.complete.call_args_list[1].kwargs["messages"][0].content
+        assert "could not be parsed" in second_prompt
+
+    def test_two_unparsable_replies_fall_back_to_zero(self):
+        llm = MagicMock()
+        llm.complete.return_value = MagicMock(text="not json", usage=None)
+        ev = LLMJudgeEvaluator(llm=llm, retry_delay=0)
+        r = ev.evaluate("a", "b")
+        assert r.score == 0.0
+        assert r.passed is False
+        assert "could not be parsed" in r.feedback
+        assert llm.complete.call_count == 2
+
+    def test_judge_temperature_pinned_to_zero_by_default(self):
+        llm = make_llm(self._judge_response())
+        ev = LLMJudgeEvaluator(llm=llm)
+        ev.evaluate("a", "b")
+        assert llm.complete.call_args.kwargs["temperature"] == 0.0
+
+    def test_temperature_none_omits_kwarg(self):
+        llm = make_llm(self._judge_response())
+        ev = LLMJudgeEvaluator(llm=llm, temperature=None)
+        ev.evaluate("a", "b")
+        assert "temperature" not in llm.complete.call_args.kwargs

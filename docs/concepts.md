@@ -117,6 +117,8 @@ config = TrainingConfig(context_retriever=my_retriever)
 
 This is the most important thing to get right when using retrieval — a mismatch here can make training converge in the wrong direction.
 
+A second, milder gap: for text inputs the eval agent batches many validation examples into **one** LLM call (XML-wrapped), while production typically runs one call per input. The model can behave slightly differently on batched inputs, so validation scores may not exactly reflect single-call production behaviour. Native-file inputs already run per-input; for text inputs, pass a custom `inference_fn` to `TrainingPipeline` if you need eval to mirror production calls exactly (at N× the eval calls).
+
 ---
 
 ## Consolidation

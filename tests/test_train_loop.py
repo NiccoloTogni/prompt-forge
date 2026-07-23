@@ -215,3 +215,98 @@ def test_final_score_is_kept_prompt_score_not_last_candidate(tmp_path):
     evaluator = ScriptedEvaluator([0.5, 0.3, 0.3])
     report = _run(tmp_path, evaluator, max_iterations=10, patience=2)
     assert report.final_score == 0.5
+
+
+# ── Schema detection across batches ───────────────────────────────────────────
+
+OPTIMIZER_REPLY = (
+    "<optimized_prompt>better</optimized_prompt>"
+    "<learnings>ok</learnings><issues></issues>"
+)
+
+
+def test_detected_schema_merges_across_batches(tmp_path):
+    from prompt_forge.training.optimizer import PromptOptimizer
+
+    b1 = _make_bundle(tmp_path, "j1", "in1", '{"a": 1}')
+    b2 = _make_bundle(tmp_path, "j2", "in2", '{"b": "x", "a": 2}')
+    opt = PromptOptimizer(llm=_make_llm(), file_loader=get_default_loader())
+
+    r1 = opt.optimize("seed", [b1])
+    assert set(r1.output_schema["properties"]) == {"a"}
+
+    # A later batch reveals a field the first batch didn't cover — the schema
+    # must pick it up instead of staying frozen on the first detection
+    r2 = opt.optimize("seed", [b2])
+    assert set(r2.output_schema["properties"]) == {"a", "b"}
+    # First-seen types are kept
+    assert r2.output_schema["properties"]["a"] == "number"
+
+
+def test_explicit_schema_bypasses_detection(tmp_path):
+    from prompt_forge.training.optimizer import PromptOptimizer
+
+    b1 = _make_bundle(tmp_path, "j1", "in1", '{"a": 1}')
+    opt = PromptOptimizer(llm=_make_llm(), file_loader=get_default_loader())
+    explicit = {"type": "object", "properties": {"z": "string"}}
+    r = opt.optimize("seed", [b1], output_schema=explicit)
+    assert r.output_schema is explicit
+    assert opt._detected_schema is None  # no detection ran
+
+
+# ── Broken bundles in evaluation ──────────────────────────────────────────────
+
+def _make_broken_bundle(tmp_path: Path, name: str) -> ExampleBundle:
+    """Bundle with a real input but a missing expected-output file."""
+    d = tmp_path / name
+    d.mkdir()
+    (d / f"{name}_input.txt").write_text("some input")
+    return ExampleBundle(bundle_id=name, files={
+        "input": d / f"{name}_input.txt",
+        "expected_output": d / f"{name}_missing.txt",  # never written
+    })
+
+
+def test_broken_val_bundle_excluded_from_mean(tmp_path):
+    store = _make_store(tmp_path)
+    train_b = _make_bundle(tmp_path, "t", "train in", "train out")
+    # The mock LLM replies with OPTIMIZER_REPLY for every call, so a val bundle
+    # whose expected output equals that reply scores 1.0 on exact match.
+    val_ok = _make_bundle(tmp_path, "v", "val in", OPTIMIZER_REPLY)
+    val_broken = _make_broken_bundle(tmp_path, "broken")
+
+    pipeline = TrainingPipeline(
+        llm=_make_llm(),
+        store=store,
+        evaluator=ExactMatchEvaluator(),
+        file_loader=get_default_loader(),
+    )
+    report = pipeline.train(
+        [train_b],
+        val_bundles=[val_ok, val_broken],
+        config=TrainingConfig(max_iterations=1, native_files=False),
+    )
+    # If "broken" had been scored as 0 the mean would be 0.5 — exclusion keeps it at 1.0
+    assert report.iterations[0].score_before == 1.0
+    assert set(report.iterations[0].val_example_scores) == {"v"}
+
+
+def test_all_val_bundles_broken_raises(tmp_path):
+    import pytest
+
+    store = _make_store(tmp_path)
+    train_b = _make_bundle(tmp_path, "t", "train in", "train out")
+    val_broken = _make_broken_bundle(tmp_path, "broken")
+
+    pipeline = TrainingPipeline(
+        llm=_make_llm(),
+        store=store,
+        evaluator=ExactMatchEvaluator(),
+        file_loader=get_default_loader(),
+    )
+    with pytest.raises(RuntimeError, match="expected output could not be loaded"):
+        pipeline.train(
+            [train_b],
+            val_bundles=[val_broken],
+            config=TrainingConfig(max_iterations=1, native_files=False),
+        )

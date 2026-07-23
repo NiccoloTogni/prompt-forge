@@ -586,42 +586,71 @@ class TrainingPipeline:
     ) -> BatchEvalResult:
         """Run inference + evaluation on the validation set.
 
+        Bundles whose expected output cannot be loaded are excluded from the
+        batch (before inference, so no tokens are wasted on them) rather than
+        scored as 0 — a broken example must not silently drag the mean down.
+        Raises RuntimeError if no bundle is evaluable at all.
+
         Uses InferenceAgent.run_bundle_batch (single LLM call) by default.
         Falls back to sequential calls when a custom inference_fn is set,
         or if the batch call raises.
         """
-        from ..bundle import is_output_role
+        from ..bundle import ExampleBundle, is_output_role
 
+        # Load expected outputs up front; exclude bundles that fail.
+        evaluable: list[tuple[ExampleBundle, str]] = []
+        skipped: list[str] = []
+        for bundle in val_bundles:
+            output_files = {
+                role: path for role, path in bundle.files.items() if is_output_role(role)
+            }
+            try:
+                contents = ExampleBundle(
+                    bundle_id=bundle.bundle_id, files=output_files
+                ).load_contents(self.file_loader)
+                expected = next(iter(contents.values())).text if contents else ""
+                evaluable.append((bundle, expected))
+            except Exception as e:
+                logger.warning(
+                    f"Excluding {bundle.bundle_id} from evaluation — "
+                    f"failed to load its expected output: {e}"
+                )
+                skipped.append(bundle.bundle_id)
+
+        if not evaluable:
+            raise RuntimeError(
+                f"Evaluation is impossible: the expected output could not be loaded "
+                f"for any of the {len(val_bundles)} bundles ({skipped}). "
+                "Check the example files."
+            )
+        if skipped:
+            logger.warning(
+                f"Evaluating {len(evaluable)}/{len(val_bundles)} examples — "
+                f"excluded due to load failures: {skipped}"
+            )
+
+        bundles = [b for b, _ in evaluable]
         if self._custom_inference_fn is None:
             # Default path: batch inference via InferenceAgent
             self._eval_agent.prompt_text = prompt_text
             tokens_before = self._eval_agent.tokens_used
             try:
-                actuals = self._eval_agent.run_bundle_batch(val_bundles, val_max_tokens)
+                actuals = self._eval_agent.run_bundle_batch(bundles, val_max_tokens)
             except Exception as e:
                 logger.warning(
                     f"Batch inference failed ({e}), falling back to sequential. "
                     f"Enable DEBUG logging to see the raw LLM response."
                 )
-                actuals = [self._eval_agent.run_bundle(b) for b in val_bundles]
+                actuals = [self._eval_agent.run_bundle(b) for b in bundles]
             self._total_tokens += self._eval_agent.tokens_used - tokens_before
         else:
             # Custom inference function: always sequential
-            actuals = [self._custom_inference_fn(prompt_text, b) for b in val_bundles]
+            actuals = [self._custom_inference_fn(prompt_text, b) for b in bundles]
 
-        results = []
-        for bundle, actual in zip(val_bundles, actuals):
-            try:
-                contents = bundle.load_contents(self.file_loader)
-                expected = next(
-                    (content.text for role, content in contents.items() if is_output_role(role)),
-                    "",
-                )
-                results.append((bundle.bundle_id, actual, expected))
-            except Exception as e:
-                logger.warning(f"Evaluation failed for {bundle.bundle_id}: {e}")
-                results.append((bundle.bundle_id, "", f"[Error: {e}]"))
-
+        results = [
+            (bundle.bundle_id, actual, expected)
+            for (bundle, expected), actual in zip(evaluable, actuals)
+        ]
         return self.evaluator.evaluate_batch(results)
 
     @staticmethod
