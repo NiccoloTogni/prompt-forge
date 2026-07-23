@@ -1,5 +1,7 @@
 """Interactive refinement page — chat-based human-in-the-loop prompt editing."""
 
+from __future__ import annotations
+
 import streamlit as st
 
 from prompt_forge.app.state import require_project, require_llm

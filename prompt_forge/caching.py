@@ -18,6 +18,8 @@ file updates are not possible.
 Token usage for cache hits is reported as zero — the call costs nothing.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging

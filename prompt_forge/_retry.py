@@ -1,5 +1,7 @@
 """Internal retry helper for LLM calls."""
 
+from __future__ import annotations
+
 import logging
 import time
 

@@ -13,6 +13,8 @@ And produces in a single LLM call:
     - A list of issues/gaps that could not be resolved
 """
 
+from __future__ import annotations
+
 import dataclasses
 import json
 import logging

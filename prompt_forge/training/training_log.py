@@ -6,6 +6,8 @@ batch of examples, it also sees the log of all previous learnings. This
 prevents forgetting.
 """
 
+from __future__ import annotations
+
 import dataclasses
 
 

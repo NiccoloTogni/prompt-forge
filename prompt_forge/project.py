@@ -15,6 +15,8 @@ It provides a high-level API for the full workflow.
         result = agent.run(input_file="new_file.pdf")
 """
 
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
 from pathlib import Path

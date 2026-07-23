@@ -1,5 +1,7 @@
 """Build an LLM client from app config."""
 
+from __future__ import annotations
+
 import streamlit as st
 from openai import AzureOpenAI
 from prompt_forge import LLMResponse

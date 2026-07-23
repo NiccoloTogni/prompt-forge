@@ -9,6 +9,8 @@ Batch inference:
     run_bundle_batch() — training/eval batch over ExampleBundle objects, single LLM call
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import re

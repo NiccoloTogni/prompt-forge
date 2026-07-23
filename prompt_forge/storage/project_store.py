@@ -8,6 +8,8 @@ Implementations:
     - SQLiteStore: Deprecated. Use SQLAlchemyStore("sqlite:///path/to/db") instead.
 """
 
+from __future__ import annotations
+
 import json
 import dataclasses
 import warnings

@@ -9,6 +9,8 @@ or:
     python -m streamlit run $(python -c "from prompt_forge.app import _main_path; print(_main_path())")
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 

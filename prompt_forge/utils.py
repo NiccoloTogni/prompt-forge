@@ -2,6 +2,8 @@
 Utility helpers for working with prompt-forge data structures.
 """
 
+from __future__ import annotations
+
 import random
 
 from .bundle import BundleCollection

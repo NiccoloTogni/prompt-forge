@@ -1,5 +1,7 @@
 """Versions page — browse prompt history and compare versions."""
 
+from __future__ import annotations
+
 import streamlit as st
 
 from prompt_forge.app.state import require_project

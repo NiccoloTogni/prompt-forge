@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .pipeline import TrainingPipeline, TrainingConfig, TrainingReport, IterationResult
 from .optimizer import PromptOptimizer
 from .batch_strategy import BatchStrategy, RandomBatchStrategy, FailurePriorityBatchStrategy

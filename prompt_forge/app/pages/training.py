@@ -1,5 +1,7 @@
 """Training page — configure, launch, and monitor training."""
 
+from __future__ import annotations
+
 import threading
 import time
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 DEFAULT_CONSOLIDATION_PROMPT = """\
 You are an expert Prompt Engineer. The system prompt below has grown large over many training
 iterations and may contain redundant, overlapping, or poorly organized rules.

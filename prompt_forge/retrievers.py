@@ -17,6 +17,8 @@ raw input before searching. Useful when inputs are long documents rather than
 short natural-language queries.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 

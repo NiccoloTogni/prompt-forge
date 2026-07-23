@@ -1,5 +1,7 @@
 """Session state helpers and app-level config persistence."""
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 

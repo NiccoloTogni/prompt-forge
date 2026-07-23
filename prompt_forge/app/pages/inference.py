@@ -1,5 +1,7 @@
 """Inference page — run the trained prompt on new inputs."""
 
+from __future__ import annotations
+
 import json
 import tempfile
 from pathlib import Path

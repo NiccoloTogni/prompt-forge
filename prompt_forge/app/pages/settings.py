@@ -1,5 +1,7 @@
 """Settings page — Azure OpenAI credentials and global config."""
 
+from __future__ import annotations
+
 import streamlit as st
 
 from prompt_forge.app.state import load_app_config, save_app_config

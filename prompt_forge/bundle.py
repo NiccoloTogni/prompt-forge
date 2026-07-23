@@ -14,6 +14,8 @@ Variadic roles accept zero or more files per bundle (stored as list[Path]).
 They are optional during validation and collected automatically during directory loading.
 """
 
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 from typing import Any

@@ -5,6 +5,8 @@ Ships with sensible defaults for common file types. Users can register
 custom loaders for any extension.
 """
 
+from __future__ import annotations
+
 import json
 import csv
 import dataclasses

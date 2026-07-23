@@ -10,6 +10,8 @@ Built-in evaluators:
 Users can implement custom evaluators by subclassing Evaluator.
 """
 
+from __future__ import annotations
+
 import dataclasses
 import difflib
 import json

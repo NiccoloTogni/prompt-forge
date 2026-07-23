@@ -1,5 +1,7 @@
 """Context & Prompt page — seed prompt, domain context, output schema."""
 
+from __future__ import annotations
+
 import json
 
 import streamlit as st

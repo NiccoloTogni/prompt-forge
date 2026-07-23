@@ -12,6 +12,8 @@ It supports resumption — if training is interrupted, it picks up where
 it left off using the stored training state.
 """
 
+from __future__ import annotations
+
 import dataclasses
 import logging
 from datetime import datetime, timezone

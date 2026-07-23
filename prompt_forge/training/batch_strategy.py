@@ -5,6 +5,8 @@ The strategy determines which examples are shown to the optimizer in each
 iteration. Good strategies maximize learning per iteration.
 """
 
+from __future__ import annotations
+
 import random
 from abc import ABC, abstractmethod
 

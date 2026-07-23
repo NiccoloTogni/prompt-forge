@@ -1,5 +1,7 @@
 """Examples page — upload, browse, and delete training examples."""
 
+from __future__ import annotations
+
 import tempfile
 from pathlib import Path
 
