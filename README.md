@@ -30,6 +30,11 @@ Traditional approaches to making LLMs perform complex tasks:
      ...                    continues until convergence
 ```
 
+> **Prefer zero setup?** [PromptFit](https://github.com/NiccoloTogni/promptfit) packages the same
+> principles as a Claude Code skill — no Python package, no API key, same portable-prompt deliverable.
+> prompt-forge is the library it graduates to: large jobs, native/binary file inputs, batch inference,
+> RAG-matched eval, SQL storage.
+
 ---
 
 ## Installation
