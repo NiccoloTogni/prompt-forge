@@ -21,7 +21,7 @@ Quick Start:
 __version__ = "0.1.0"
 
 from .project import Project
-from .utils import train_val_split
+from .utils import train_val_split, train_val_test_split
 from .inference.agent import InferenceAgent
 from .bundle import BundleSchema, BundleCollection, ExampleBundle
 from .llm.client import LLMClient, LLMResponse, LLMMessage, TextPart, FilePart, MessageContent
@@ -59,6 +59,7 @@ __all__ = [
     "CachedLLM",
     "WebSearchRetriever",
     "train_val_split",
+    "train_val_test_split",
     # LLM
     "LLMClient",
     "LLMResponse",

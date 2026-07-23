@@ -51,7 +51,7 @@ Supported file extras: `pdf`, `excel`, `docx`. Storage: `sqlalchemy`. Search: `d
 ## Quick Start
 
 ```python
-from prompt_forge import Project, TrainingConfig, train_val_split
+from prompt_forge import Project, TrainingConfig, train_val_test_split
 
 # 1. Wrap your LLM (any provider)
 class MyLLM:
@@ -68,10 +68,12 @@ project.set_seed_prompt("Extract all relevant fields and return structured JSON.
 # 3. Load examples (one subdirectory per example)
 project.add_examples_from_directory("./training_data/")
 
-# 4. Train
-train, val = train_val_split(project.bundles, val_ratio=0.2, seed=42)
-report = project.train(train, val_bundles=val, eval_strategy="json_fields",
+# 4. Train — val drives accept/reject; test is scored once at the end (unbiased)
+train, val, test = train_val_test_split(project.bundles, seed=42)
+report = project.train(train, val_bundles=val, test_bundles=test,
+                       eval_strategy="json_fields",
                        config=TrainingConfig(batch_size=5, max_iterations=20, patience=3))
+print(report.test_score)  # held-out generalization score
 
 # 5. Run inference with the trained prompt
 agent = project.get_inference_agent()
@@ -85,6 +87,7 @@ See **[docs/quickstart.md](docs/quickstart.md)** for the full step-by-step guide
 ## Features
 
 - **Iterative optimization** — batch-based training loop with early stopping and full prompt version history
+- **Honest scoring** — train/val/test split with a held-out test score computed once, outside the accept/reject loop
 - **Structured JSON output** — schema-aware prompts with automatic JSON parsing at inference time
 - **Flexible evaluation** — exact match, JSON field comparison, token F1, embedding similarity, LLM-as-judge, or custom
 - **Batch inference** — true single-call batching with chunking, concurrent fallback for file inputs

@@ -241,6 +241,7 @@ class Project:
         train_bundles=None,
         *,
         val_bundles=None,
+        test_bundles=None,
         config: TrainingConfig | None = None,
         eval_strategy: str | Evaluator | None = "llm_judge",
         batch_strategy: BatchStrategy | None = None,
@@ -258,6 +259,12 @@ class Project:
                            out of the optimizer's view.
             val_bundles: Validation examples used for scoring. When provided,
                          ``patience`` and ``min_improvement`` become effective.
+            test_bundles: Held-out examples evaluated exactly once on the final
+                          prompt, after training ends. The loop hill-climbs on
+                          the validation score, so only a set it never sees gives
+                          an unbiased generalization estimate — reported as
+                          ``TrainingReport.test_score``. Use ``train_val_test_split``
+                          to produce the three sets.
             config: Full training configuration. Use ``TrainingConfig`` to control
                     batch size, iterations, evaluation thresholds, token budgets,
                     temperatures, and more. Defaults to ``TrainingConfig()`` (all defaults).
@@ -314,7 +321,12 @@ class Project:
             on_iteration=on_iteration,
         )
 
-        return pipeline.train(train_bundles, val_bundles=val_bundles, config=config)
+        return pipeline.train(
+            train_bundles,
+            val_bundles=val_bundles,
+            test_bundles=test_bundles,
+            config=config,
+        )
 
     def consolidate(self, version: int | None = None):
         """

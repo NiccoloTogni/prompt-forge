@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_BATCH_SIZE = 10
 DEFAULT_MAX_ITERATIONS = 20
 DEFAULT_MIN_IMPROVEMENT = 0.0        # Accept any improvement; ignored when evaluator is None
-DEFAULT_PATIENCE = 5                 # Early-stop after N non-improving iters; ignored when evaluator is None
+DEFAULT_PATIENCE = 5                 # Early-stop after N iters without strict val improvement; ignored when evaluator is None
 DEFAULT_REFINEMENT_THRESHOLD = 0.8   # Scores below this flag refinement_recommended=True
 DEFAULT_INFERENCE_TEMPERATURE = None  # None = use model default; set to 0.0 for deterministic eval
 MAX_SUMMARY_ENTRIES = 15             # Number of recent iterations to include in optimizer context
@@ -92,6 +92,8 @@ class TrainingReport:
     final_score: float | None
     refinement_recommended: bool  # True if score is below refinement_threshold or unknown
     total_tokens_used: int = 0   # Cumulative input + output tokens across the entire run
+    test_score: float | None = None                     # One-shot score on held-out test_bundles (None if not provided)
+    test_example_scores: dict[str, float] | None = None  # Per-example test scores: bundle_id → score
 
     @property
     def all_issues(self) -> list[tuple[int, str]]:
@@ -217,6 +219,7 @@ class TrainingPipeline:
         train_bundles: BundleCollection | list[ExampleBundle],
         *,
         val_bundles: BundleCollection | list[ExampleBundle] | None = None,
+        test_bundles: BundleCollection | list[ExampleBundle] | None = None,
         config: TrainingConfig | None = None,
     ) -> TrainingReport:
         """
@@ -225,6 +228,11 @@ class TrainingPipeline:
         Args:
             train_bundles: Training examples used for optimization.
             val_bundles: Validation examples used for scoring (optional).
+            test_bundles: Held-out examples evaluated exactly once, on the final
+                          prompt, after the loop ends. Accept/reject decisions
+                          hill-climb on the validation score, so only a set the
+                          loop never sees gives an unbiased estimate of
+                          generalization (reported as TrainingReport.test_score).
             config: Training configuration.
 
         Returns:
@@ -264,6 +272,11 @@ class TrainingPipeline:
         self.optimizer.retry_delay = config.retry_delay
         no_improvement_count = 0
         _failed_batch_ids: list[str] = []  # IDs from the last non-improving batch
+        # Cached val eval of the current prompt — computed once, then reused
+        # until a new prompt is accepted. Halves eval cost vs re-scoring the
+        # baseline every iteration, and keeps accept/reject comparisons against
+        # a stable baseline instead of a freshly-sampled (noisy) one.
+        current_eval_result: BatchEvalResult | None = None
 
         # Get starting prompt
         current = self.store.get_latest_prompt()
@@ -284,10 +297,23 @@ class TrainingPipeline:
         else:
             _val_list = []
 
+        # Resolve test_bundles to a flat list
+        if isinstance(test_bundles, BundleCollection):
+            _test_list = test_bundles.bundles
+        elif test_bundles is not None:
+            _test_list = list(test_bundles)
+        else:
+            _test_list = []
+
         if self.evaluator is not None and not _val_list:
             logger.warning(
                 "An evaluator is set but no val_bundles were provided — "
                 "evaluation will be skipped. Pass val_bundles to enable scoring."
+            )
+        if self.evaluator is None and _test_list:
+            logger.warning(
+                "test_bundles were provided but no evaluator is set — "
+                "the final test evaluation will be skipped."
             )
 
         logger.info(
@@ -309,20 +335,26 @@ class TrainingPipeline:
             batch_ids = [b.bundle_id for b in batch]
             logger.info(f"Selected batch: {batch_ids}")
 
-            # 2. Evaluate current prompt (optional, for scoring)
+            # 2. Evaluate current prompt (optional, for scoring).
+            #    Reuses the cached result — the current prompt was either scored
+            #    at iteration 1 or is the accepted candidate of a previous
+            #    iteration, whose eval we already have.
             score_before = None
             eval_feedback = ""
             if self.evaluator is not None and _val_list:
-                eval_result = self._evaluate_prompt(current_prompt, _val_list, config.val_max_tokens)
-                score_before = eval_result.mean_score
-                if eval_result.failed_examples:
+                if current_eval_result is None:
+                    current_eval_result = self._evaluate_prompt(
+                        current_prompt, _val_list, config.val_max_tokens
+                    )
+                score_before = current_eval_result.mean_score
+                if current_eval_result.failed_examples:
                     feedback_lines = [
                         f"- {f['bundle_id']}: {f['feedback']}"
-                        for f in eval_result.failed_examples[:10]
+                        for f in current_eval_result.failed_examples[:10]
                     ]
                     eval_feedback = (
-                        f"Current prompt scores {eval_result.mean_score:.2f} "
-                        f"({eval_result.pass_rate:.0%} pass rate).\n"
+                        f"Current prompt scores {current_eval_result.mean_score:.2f} "
+                        f"({current_eval_result.pass_rate:.0%} pass rate).\n"
                         f"Failures:\n" + "\n".join(feedback_lines)
                     )
                 logger.info(f"Score before: {score_before:.3f}")
@@ -345,6 +377,7 @@ class TrainingPipeline:
             # 4. Evaluate new prompt
             score_after = None
             improved = False
+            made_progress = True  # strict val gain — drives the patience counter
             new_eval_result = None
             if self.evaluator is not None and _val_list:
                 new_eval_result = self._evaluate_prompt(opt_result.new_prompt, _val_list, config.val_max_tokens)
@@ -352,6 +385,9 @@ class TrainingPipeline:
                 improved = (
                     score_before is None
                     or score_after >= score_before + config.min_improvement
+                )
+                made_progress = improved and (
+                    score_before is None or score_after > score_before
                 )
                 logger.info(f"Score after: {score_after:.3f} ({'improved' if improved else 'not improved'})")
             else:
@@ -371,7 +407,7 @@ class TrainingPipeline:
             if improved:
                 current_version += 1
                 current_prompt = opt_result.new_prompt
-                no_improvement_count = 0
+                current_eval_result = new_eval_result  # accepted prompt's eval becomes the new baseline
                 _failed_batch_ids = []
 
                 # Save new version
@@ -389,9 +425,16 @@ class TrainingPipeline:
                 self.store.save_prompt_version(version)
                 logger.info(f"Saved prompt version {current_version}")
             else:
-                no_improvement_count += 1
                 _failed_batch_ids = batch_ids  # retry these with FailurePriorityBatchStrategy
-                logger.info(f"Prompt not improved ({no_improvement_count}/{config.patience})")
+
+            # Patience counts iterations without a STRICT val improvement: a tie
+            # can be accepted (min_improvement=0) but must not reset the counter,
+            # otherwise training never stops on a flat plateau.
+            if made_progress:
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
+                logger.info(f"No val improvement ({no_improvement_count}/{config.patience})")
 
             # 6. Update training log
             log_entry = LogEntry(
@@ -445,13 +488,34 @@ class TrainingPipeline:
                 break
 
         logger.info(f"\nTraining complete. Final version: {current_version}")
-        final_score = results[-1].score_after if results else None
+        # Score of the prompt actually kept — not of the last candidate, which
+        # may have been rejected.
+        if current_eval_result is not None:
+            final_score = current_eval_result.mean_score
+        else:
+            final_score = results[-1].score_after if results else None
+
+        # One-shot held-out test evaluation — runs outside the accept/reject
+        # loop, so the score is not inflated by hill-climbing on the val set.
+        test_score = None
+        test_example_scores = None
+        if self.evaluator is not None and _test_list:
+            logger.info(f"Evaluating final prompt on held-out test set ({len(_test_list)} examples)...")
+            test_eval = self._evaluate_prompt(current_prompt, _test_list, config.val_max_tokens)
+            test_score = test_eval.mean_score
+            test_example_scores = test_eval.example_scores
+            logger.info(f"Test score: {test_score:.3f}")
+
+        # The test score, when available, is the honest generalization signal.
+        reference_score = test_score if test_score is not None else final_score
         return TrainingReport(
             iterations=results,
             final_version=current_version,
             final_score=final_score,
+            test_score=test_score,
+            test_example_scores=test_example_scores,
             refinement_recommended=(
-                final_score is None or final_score < config.refinement_threshold
+                reference_score is None or reference_score < config.refinement_threshold
             ),
             total_tokens_used=self._total_tokens - _tokens_at_start,
         )

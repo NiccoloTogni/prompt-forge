@@ -19,11 +19,12 @@ The optimizer (itself an LLM) reads labeled examples and extracts rules, edge ca
 Each iteration:
 
 1. **Batch selection** — a subset of training bundles is drawn (randomly by default).
-2. **Score current prompt** — the prompt is run on the validation set. This is `score_before`.
+2. **Score current prompt** — the current prompt's validation score is `score_before`. It is computed once (at iteration 1, or when the prompt was accepted in a previous iteration) and reused — the baseline is never re-scored, which halves eval cost and keeps comparisons against a stable baseline instead of a freshly-sampled, noisy one.
 3. **Optimize** — the optimizer receives the current prompt, the training batch with ground truth, and a compact summary of past iterations. It returns an improved prompt plus `learnings` (rules it extracted) and `issues` (gaps it could not resolve with the current data).
 4. **Score new prompt** — the new prompt is run on the same validation set. This is `score_after`.
 5. **Accept or reject** — accepted if `score_after >= score_before + min_improvement`. Accepted versions are saved; rejected ones are not.
-6. **Early stopping** — if `patience` consecutive iterations produce no improvement, training stops.
+6. **Early stopping** — if `patience` consecutive iterations produce no **strict** validation improvement, training stops. Note the asymmetry with acceptance: with `min_improvement=0` a tie is still accepted (the new prompt learned from a fresh batch the val set may not measure), but it counts toward `patience` — so training stops on a flat plateau instead of churning versions until `max_iterations`.
+7. **Final test evaluation** — if `test_bundles` were provided, the final prompt is scored on them exactly once, after the loop (`TrainingReport.test_score`).
 
 The optimizer accumulates context across iterations via the training log — a compact summary of past learnings. This prevents it from re-learning the same rules and allows it to build incrementally.
 
@@ -61,12 +62,20 @@ These must be kept strictly separate:
 
 If training and validation overlap, the optimizer can memorize specific examples rather than learning generalizable rules — the validation score will be inflated and performance on new data will be worse.
 
-Use `train_val_split` twice:
+The test set matters for a subtler reason too: the loop *hill-climbs on the validation score* — every accept/reject decision selects for prompts that happen to do well on val. After many iterations the final validation score is optimistically biased, even with perfect train/val separation. Only a set the loop never used for any decision gives an honest generalization number.
+
+Use `train_val_test_split` and pass the test set to `train()` — it is evaluated exactly once, on the final prompt:
 
 ```python
-train_val, test = train_val_split(all_bundles, val_ratio=0.2, seed=42)
-train, val = train_val_split(train_val, val_ratio=0.2, seed=42)
+from prompt_forge import train_val_test_split
+
+train, val, test = train_val_test_split(all_bundles, val_ratio=0.2, test_ratio=0.2, seed=42)
+report = project.train(train, val_bundles=val, test_bundles=test, config=...)
+print(report.final_score)  # val score — biased upward by prompt selection
+print(report.test_score)   # held-out test score — the number to report
 ```
+
+When `test_score` is available, `refinement_recommended` is based on it rather than the validation score.
 
 ---
 

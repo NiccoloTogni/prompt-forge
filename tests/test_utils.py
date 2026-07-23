@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 
 from prompt_forge.bundle import BundleSchema, BundleCollection, ExampleBundle
-from prompt_forge.utils import train_val_split
+from prompt_forge.utils import train_val_split, train_val_test_split
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,3 +142,64 @@ def test_single_item_collection_raises():
     # val ends up empty but no error is raised (edge case, not a crash)
     train, val = train_val_split(col, val_size=1)
     assert len(train) + len(val) == 1
+
+
+# ── train_val_test_split ──────────────────────────────────────────────────────
+
+def test_three_way_split_is_disjoint_and_complete():
+    col = make_collection(10)
+    train, val, test = train_val_test_split(col, seed=42)
+    train_ids = {b.bundle_id for b in train.bundles}
+    val_ids = {b.bundle_id for b in val.bundles}
+    test_ids = {b.bundle_id for b in test.bundles}
+    assert train_ids & val_ids == set()
+    assert train_ids & test_ids == set()
+    assert val_ids & test_ids == set()
+    assert train_ids | val_ids | test_ids == {f"b{i}" for i in range(10)}
+
+
+def test_three_way_split_default_ratios():
+    col = make_collection(10)
+    train, val, test = train_val_test_split(col)
+    assert len(val.bundles) == 2
+    assert len(test.bundles) == 2
+    assert len(train.bundles) == 6
+
+
+def test_three_way_split_explicit_sizes():
+    col = make_collection(10)
+    train, val, test = train_val_test_split(col, val_size=3, test_size=4)
+    assert len(val.bundles) == 3
+    assert len(test.bundles) == 4
+    assert len(train.bundles) == 3
+
+
+def test_three_way_split_reproducible_with_seed():
+    col = make_collection(10)
+    t1, v1, s1 = train_val_test_split(col, seed=7)
+    t2, v2, s2 = train_val_test_split(col, seed=7)
+    assert [b.bundle_id for b in v1.bundles] == [b.bundle_id for b in v2.bundles]
+    assert [b.bundle_id for b in s1.bundles] == [b.bundle_id for b in s2.bundles]
+
+
+def test_three_way_split_requires_three_examples():
+    col = make_collection(2)
+    with pytest.raises(ValueError):
+        train_val_test_split(col)
+
+
+def test_three_way_split_minimum_collection():
+    col = make_collection(3)
+    train, val, test = train_val_test_split(col)
+    assert len(train.bundles) == 1
+    assert len(val.bundles) == 1
+    assert len(test.bundles) == 1
+
+
+def test_three_way_split_extreme_sizes_keep_one_train_example():
+    col = make_collection(5)
+    train, val, test = train_val_test_split(col, val_size=10, test_size=10)
+    assert len(train.bundles) >= 1
+    assert len(val.bundles) >= 1
+    assert len(test.bundles) >= 1
+    assert len(train.bundles) + len(val.bundles) + len(test.bundles) == 5

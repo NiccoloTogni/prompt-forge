@@ -173,21 +173,24 @@ print(f"Loaded {project.num_examples} examples")
 
 ## Step 4 — Train
 
-Split examples into training and validation sets, then run the loop:
+Split examples into training, validation, and test sets, then run the loop:
 
 ```python
-from prompt_forge import TrainingConfig, train_val_split
+from prompt_forge import TrainingConfig, train_val_test_split
 
-train_bundles, val_bundles = train_val_split(project.bundles, val_ratio=0.2, seed=42)
+train_bundles, val_bundles, test_bundles = train_val_test_split(
+    project.bundles, val_ratio=0.2, test_ratio=0.2, seed=42
+)
 
 report = project.train(
     train_bundles,
     val_bundles=val_bundles,
+    test_bundles=test_bundles,     # evaluated once at the end — unbiased score
     eval_strategy="json_fields",   # field-by-field JSON comparison
     config=TrainingConfig(
         batch_size=5,       # examples per optimizer call
         max_iterations=20,  # hard stop
-        patience=3,         # stop after 3 non-improving iterations
+        patience=3,         # stop after 3 iterations without val improvement
     ),
 )
 
@@ -197,7 +200,9 @@ for r in report:
     after  = f"{r.score_after:.2f}"  if r.score_after  is not None else "—"
     print(f"Iter {r.iteration}: {before} → {after} {status}")
 
-print(f"\nFinal score: {report.final_score:.2f} (version {report.final_version})")
+print(f"\nFinal val score: {report.final_score:.2f} (version {report.final_version})")
+if report.test_score is not None:
+    print(f"Held-out test score: {report.test_score:.2f}")  # the number to report
 
 # One LLM call — summarises recurring gaps across all iterations
 # Tells you what training data to add for the next run
@@ -228,27 +233,9 @@ agent = project.get_inference_agent(version=report.final_version)
 
 ## Common next steps
 
-### Hold out a test set for unbiased final scoring
+### Why a test set?
 
-```python
-from prompt_forge import train_val_split
-
-# Split before training — test set is never seen
-train_val, test = train_val_split(project.bundles, val_ratio=0.2, seed=42)
-train, val = train_val_split(train_val, val_ratio=0.2, seed=42)
-
-report = project.train(train, val_bundles=val, ...)
-
-# Evaluate once on the held-out test set
-from prompt_forge import JsonFieldEvaluator
-evaluator = JsonFieldEvaluator()
-agent = project.get_inference_agent(version=report.final_version)
-test_result = evaluator.evaluate_batch([
-    (b.bundle_id, agent.run_bundle(b), b.load_contents()["expected_output"].text)
-    for b in test
-])
-print(f"Test score: {test_result.mean_score:.3f}")
-```
+The training loop accepts or rejects each candidate prompt based on its validation score — it hill-climbs on the val set, so the final `report.final_score` is optimistically biased even with perfect train/val separation. The `test_bundles` you pass to `train()` are evaluated exactly once, on the final prompt, after the loop: `report.test_score` (with per-example detail in `report.test_example_scores`) is the honest generalization number, and it also drives `report.refinement_recommended` when present.
 
 ### Speed up development with LLM caching
 

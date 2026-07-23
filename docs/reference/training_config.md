@@ -26,7 +26,7 @@ config = TrainingConfig(
 | `batch_size` | `int` | `10` | Number of training examples per optimizer call. |
 | `max_iterations` | `int` | `20` | Maximum training iterations before stopping. |
 | `min_improvement` | `float` | `0.0` | Minimum score delta required to accept a new prompt version. Only meaningful when an evaluator is set. |
-| `patience` | `int` | `5` | Stop early after this many consecutive non-improving iterations. Ignored when no evaluator is set. |
+| `patience` | `int` | `5` | Stop early after this many consecutive iterations without a *strict* val improvement. A tie is accepted (with `min_improvement=0`) but still counts toward patience, so training stops on a flat plateau. Ignored when no evaluator is set. |
 | `val_max_tokens` | `int \| None` | `None` | Token budget per eval batch call. `None` = no limit. |
 | `auto_save` | `bool` | `True` | Save training state after each iteration for resumption. |
 | `output_schema` | `dict \| None` | `None` | JSON Schema passed to the optimizer when the task requires structured output. |
@@ -130,8 +130,10 @@ Returned by `TrainingPipeline.train()`. Iterable — `for r in report` yields `I
 |-------|------|-------------|
 | `iterations` | `list[IterationResult]` | All iteration results. |
 | `final_version` | `int` | Version number of the best accepted prompt. |
-| `final_score` | `float \| None` | Score of the final accepted prompt. `None` if no evaluator. |
-| `refinement_recommended` | `bool` | `True` if `final_score` is below `refinement_threshold` or unknown. |
+| `final_score` | `float \| None` | Val score of the prompt actually kept (not of the last candidate, which may have been rejected). `None` if no evaluator. |
+| `test_score` | `float \| None` | Score on the held-out `test_bundles`, evaluated exactly once on the final prompt after the loop. Unbiased by val-set hill climbing. `None` if no test set or no evaluator. |
+| `test_example_scores` | `dict[str, float] \| None` | Per-example test scores: `bundle_id → score`. |
+| `refinement_recommended` | `bool` | `True` if the reference score (`test_score` when available, else `final_score`) is below `refinement_threshold` or unknown. |
 | `total_tokens_used` | `int` | Cumulative input + output tokens for the entire run. |
 
 ### Properties
@@ -184,6 +186,8 @@ Training logs a warning and stops early when `max_total_tokens` is reached.
 ## Design notes
 
 - **No evaluator:** when `evaluator=None`, the pipeline accepts all optimizer suggestions, runs all `max_iterations`, and ignores `patience`, `min_improvement`, and validation scoring. Useful when you want to run a fixed number of optimization passes without automated scoring.
+- **Baseline eval reuse:** the current prompt's val score is computed once and reused until a new prompt is accepted (the accepted candidate's eval becomes the new baseline). This halves eval cost per iteration and keeps accept/reject comparisons against a stable baseline instead of a freshly-sampled, noisy one.
+- **Held-out test set:** pass `test_bundles` to `train()` to get `TrainingReport.test_score` — a single evaluation of the final prompt on data the loop never used for any decision. Because acceptance hill-climbs on the val score, `final_score` is optimistically biased; report `test_score`. Use `train_val_test_split` to produce the three sets.
 - **No val set:** when `evaluator` is set but `val_bundles` is empty, a warning is logged and evaluation is skipped. The prompt is accepted unconditionally (same as no-evaluator mode).
 - **Resumption:** `auto_save=True` (default) writes training state after each iteration. If training is interrupted, the next call to `train()` on the same pipeline instance will detect and log the restored state. The training log provides context to the optimizer so it avoids repeating the same changes.
 - **Consolidation timing:** consolidate after a plateau (several iterations without improvement) or when the prompt exceeds a character count you're comfortable with. Consolidation does not reset training history — the optimizer still has access to prior learnings.
